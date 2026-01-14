@@ -1,0 +1,63 @@
+{
+  "name": "@appknox/mcp-server",
+  "version": "1.0.0",
+  "description": "Official Model Context Protocol (MCP) server for Appknox - enables AI assistants to perform mobile application security testing",
+  "main": "build/index.js",
+  "type": "module",
+  "bin": {
+    "appknox-mcp": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/verify-build.js",
+    "build:tsc": "tsc",
+    "dev": "tsc --watch",
+    "start": "node build/index.js",
+    "verify": "node scripts/verify-build.js",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "appknox",
+    "security",
+    "mobile-security",
+    "appsec",
+    "security-testing",
+    "sast",
+    "dast",
+    "vulnerability-scanning",
+    "android",
+    "ios",
+    "ai",
+    "llm",
+    "claude"
+  ],
+  "author": "Appknox",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/appknox/appknox-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/appknox/appknox-mcp/issues"
+  },
+  "homepage": "https://github.com/appknox/appknox-mcp#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "build/**/*",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

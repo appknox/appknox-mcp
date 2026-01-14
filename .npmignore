@@ -1,0 +1,39 @@
+# Source files
+src/
+tsconfig.json
+
+# Development files
+.claude/
+node_modules/
+*.log
+*.tsbuildinfo
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+test/
+tests/
+*.test.ts
+*.spec.ts
+
+# Documentation
+docs/
+.github/
+
+# Build artifacts (keep source maps for debugging)
+# Note: We're including source maps for better debugging experience
+
+# Scripts (not needed in distribution)
+scripts/
