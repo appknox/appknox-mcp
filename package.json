@@ -1,6 +1,6 @@
 {
   "name": "@appknox/mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Official Model Context Protocol (MCP) server for Appknox - enables AI assistants to perform mobile application security testing",
   "main": "build/index.js",
   "type": "module",

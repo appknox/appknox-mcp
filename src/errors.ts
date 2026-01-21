@@ -61,10 +61,34 @@ export class FilePathError extends AppknoxMCPError {
 }
 
 /**
+ * Formats Zod validation errors into user-friendly messages
+ */
+function formatZodError(errorMessage: string): string {
+  try {
+    const errors = JSON.parse(errorMessage);
+    if (Array.isArray(errors)) {
+      const messages = errors.map((e: { path?: string[]; message?: string; expected?: string }) => {
+        const field = e.path?.join('.') || 'unknown field';
+        return `${field}: ${e.message || 'invalid value'}${e.expected ? ` (expected ${e.expected})` : ''}`;
+      });
+      return `Missing or invalid arguments: ${messages.join(', ')}`;
+    }
+  } catch {
+    // Not a JSON error, return as is
+  }
+  return errorMessage;
+}
+
+/**
  * Determines error type from error message and creates appropriate error instance
  */
 export function classifyError(error: unknown): AppknoxMCPError {
   const errorMessage = error instanceof Error ? error.message : String(error);
+
+  // Check for Zod validation errors (JSON array format)
+  if (errorMessage.startsWith('[') && errorMessage.includes('"code"')) {
+    return new ValidationError(formatZodError(errorMessage));
+  }
 
   // Check for CLI not found
   if (errorMessage.includes('ENOENT') || errorMessage.includes('not found')) {

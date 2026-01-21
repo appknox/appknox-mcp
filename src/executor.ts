@@ -169,7 +169,18 @@ export async function executeAppknoxCommand(
   }
 
   return new Promise((resolve, reject) => {
-    const childProcess = spawn('appknox', [command, ...args], {
+    // Use absolute path to appknox CLI to ensure it works in sandboxed environments (e.g., Claude Desktop)
+    const appknoxPath = process.env.APPKNOX_CLI_PATH || '/usr/local/bin/appknox';
+
+    logger.info('Executing appknox command', {
+      appknoxPath,
+      command,
+      args,
+      hasAccessToken: !!env.APPKNOX_ACCESS_TOKEN,
+      timeout,
+    });
+
+    const childProcess = spawn(appknoxPath, [command, ...args], {
       env,
       shell: false, // Prevent command injection
     });
@@ -190,20 +201,31 @@ export async function executeAppknoxCommand(
     }
 
     childProcess.stdout.on('data', (data) => {
-      stdout += data.toString();
+      const chunk = data.toString();
+      stdout += chunk;
+      logger.debug('stdout chunk', { command, chunk: chunk.substring(0, 500) });
     });
 
     childProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
+      const chunk = data.toString();
+      stderr += chunk;
+      logger.debug('stderr chunk', { command, chunk: chunk.substring(0, 500) });
     });
 
     childProcess.on('error', (error) => {
       if (timeoutHandle) clearTimeout(timeoutHandle);
       if (killed) return; // Ignore errors after timeout
 
+      logger.error('Process spawn error', {
+        command,
+        args,
+        errorCode: (error as NodeJS.ErrnoException).code,
+        errorMessage: error.message,
+      });
+
       // Check if appknox CLI is not installed
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        logger.error('Appknox CLI not found');
+        logger.error('Appknox CLI not found at path', { appknoxPath });
         reject(new CLINotFoundError());
       } else {
         logger.error('Command execution failed', error);
@@ -220,6 +242,16 @@ export async function executeAppknoxCommand(
         stderr: sanitizeError(stderr.trim()),
         exitCode: exitCode || 0,
       };
+
+      logger.info('Command completed', {
+        command,
+        args,
+        exitCode,
+        stdoutLength: stdout.length,
+        stderrLength: stderr.length,
+        stdout: stdout.substring(0, 1000),
+        stderr: stderr.substring(0, 1000),
+      });
 
       if (exitCode !== 0) {
         logger.debug('Command completed with non-zero exit code', { command, exitCode });
