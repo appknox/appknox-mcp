@@ -1,10 +1,14 @@
 import { z } from 'zod';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import {
   executeAppknoxCommandStrict,
   executeAppknoxCommand,
   validateNumericId,
   validateRiskThreshold,
 } from './executor.js';
+import logger from './logger.js';
 
 // Zod schemas for input validation
 const WhoamiSchema = z.object({});
@@ -60,14 +64,9 @@ const ReportsCreateSchema = z.object({
 });
 
 const ReportsDownloadSchema = z.object({
-  report_id: z.number().int().positive().describe('Report ID to download'),
-  output_path: z.string().describe('Output file path'),
-  format: z.enum(['csv', 'excel']).describe('Report format'),
+  file_id: z.number().int().positive().describe('File ID to download report for'),
 });
 
-const ScheduleDastAutomationSchema = z.object({
-  file_id: z.number().int().positive().describe('File ID to schedule DAST for'),
-});
 
 const DastcheckSchema = z.object({
   file_id: z.number().int().positive().describe('File ID to check DAST status for'),
@@ -144,7 +143,7 @@ export const tools = [
   },
   {
     name: 'appknox_files',
-    description: 'List all files for a specific project with optional version filtering',
+    description: 'List all files (app versions) for a specific project. Requires project_id which can be obtained from appknox_projects.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -182,7 +181,7 @@ export const tools = [
   },
   {
     name: 'appknox_analyses',
-    description: 'List all security analyses for a specific file',
+    description: 'List all security analysis results (vulnerabilities) for a specific file. Requires file_id which can be obtained from appknox_files.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -243,20 +242,53 @@ export const tools = [
   },
   {
     name: 'appknox_upload',
-    description: 'Upload a mobile application package (APK/IPA) for security scanning. Returns the file ID.',
+    description: 'Upload a mobile application package (APK/IPA) for security scanning. Returns the file ID. IMPORTANT: The file_path must be an absolute path on the HOST machine filesystem (e.g., /Users/username/Downloads/app.apk on Mac, or C:\\Users\\username\\Downloads\\app.apk on Windows). Paths inside Claude Desktop sandbox (/mnt/user-data/, /tmp/ inside sandbox) will NOT work. The user must provide the real path where the file exists on their actual computer, not paths from drag-and-drop uploads.',
     inputSchema: {
       type: 'object',
       properties: {
         file_path: {
           type: 'string',
-          description: 'Local path to the APK or IPA file (required)',
+          description: 'Absolute path to the APK or IPA file on the local filesystem (required). Must be a real path like /Users/name/Downloads/app.apk, NOT a sandbox path like /mnt/user-data/uploads/',
         },
       },
       required: ['file_path'],
     },
     handler: async (args: unknown) => {
       const params = UploadSchema.parse(args);
+
+      logger.info('Upload requested', {
+        file_path: params.file_path,
+        fileExists: fs.existsSync(params.file_path),
+      });
+
+      // Check if file exists
+      if (!fs.existsSync(params.file_path)) {
+        const error = `File not found: ${params.file_path}`;
+        logger.error('Upload failed - file not found', { file_path: params.file_path });
+        return {
+          content: [{
+            type: 'text',
+            text: error,
+          }],
+          isError: true,
+        };
+      }
+
+      // Get file stats
+      const stats = fs.statSync(params.file_path);
+      logger.info('File stats', {
+        file_path: params.file_path,
+        size: stats.size,
+        isFile: stats.isFile(),
+      });
+
       const result = await executeAppknoxCommandStrict('upload', [params.file_path]);
+
+      logger.info('Upload completed', {
+        file_path: params.file_path,
+        result: result.substring(0, 500),
+      });
+
       return {
         content: [{
           type: 'text',
@@ -267,7 +299,7 @@ export const tools = [
   },
   {
     name: 'appknox_cicheck',
-    description: 'Check for vulnerabilities based on risk threshold. Fails (exit code 1) if vulnerabilities above threshold are found.',
+    description: 'Check for vulnerabilities based on risk threshold. Fails if vulnerabilities above threshold are found. Requires file_id (from appknox_files) and risk_threshold.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -392,72 +424,81 @@ export const tools = [
   },
   {
     name: 'appknox_reports_download',
-    description: 'Download a vulnerability report in CSV or Excel format',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        report_id: {
-          type: 'number',
-          description: 'Report ID to download (required)',
-        },
-        output_path: {
-          type: 'string',
-          description: 'Output file path (required)',
-        },
-        format: {
-          type: 'string',
-          enum: ['csv', 'excel'],
-          description: 'Report format: csv or excel (required)',
-        },
-      },
-      required: ['report_id', 'output_path', 'format'],
-    },
-    handler: async (args: unknown) => {
-      const params = ReportsDownloadSchema.parse(args);
-      validateNumericId(params.report_id, 'report_id');
-
-      const subcommand = params.format === 'csv' ? 'summary-csv' : 'summary-excel';
-      const cmdArgs = [
-        'download',
-        subcommand,
-        params.report_id.toString(),
-        '--output',
-        params.output_path,
-      ];
-
-      const result = await executeAppknoxCommandStrict('reports', cmdArgs);
-      return {
-        content: [{
-          type: 'text',
-          text: `Report downloaded successfully to: ${params.output_path}`,
-        }],
-      };
-    },
-  },
-  {
-    name: 'appknox_schedule_dast',
-    description: 'Schedule an automated dynamic application security testing (DAST) scan for a file',
+    description: 'Download a vulnerability report for a file in CSV format. Requires file_id (from appknox_files). Automatically creates a new report if one does not exist. Returns the CSV content directly as text - no file path needed.',
     inputSchema: {
       type: 'object',
       properties: {
         file_id: {
           type: 'number',
-          description: 'File ID to schedule DAST for (required)',
+          description: 'File ID to download report for (required)',
         },
       },
       required: ['file_id'],
     },
     handler: async (args: unknown) => {
-      const params = ScheduleDastAutomationSchema.parse(args);
+      const params = ReportsDownloadSchema.parse(args);
       validateNumericId(params.file_id, 'file_id');
 
-      const result = await executeAppknoxCommandStrict('schedule-dast-automation', [params.file_id.toString()]);
-      return { content: [{ type: 'text', text: result }] };
+      // First, create a report for the file (this will return the report ID)
+      let reportId: string;
+      try {
+        const createResult = await executeAppknoxCommandStrict('reports', ['create', params.file_id.toString()]);
+        const trimmedResult = createResult.trim();
+
+        // Check if the result contains an error (CLI may return 0 even on API errors)
+        if (trimmedResult.includes('400') || trimmedResult.includes('404') || trimmedResult.includes('error')) {
+          throw new Error(`API returned error: ${trimmedResult}. The scan may not be complete yet - some analyses are still in 'Waiting' status.`);
+        }
+
+        // Extract report ID (should be a numeric value)
+        const reportIdMatch = trimmedResult.match(/(\d+)/);
+        if (!reportIdMatch) {
+          throw new Error(`Could not extract report ID from response: ${trimmedResult}`);
+        }
+        reportId = reportIdMatch[1];
+      } catch (error) {
+        throw new Error(`Failed to create report for file ${params.file_id}: ${error}`);
+      }
+
+      const tempDir = os.tmpdir();
+      const tempFile = path.join(tempDir, `appknox_report_${params.file_id}_${Date.now()}.csv`);
+
+      const cmdArgs = [
+        'download',
+        'summary-csv',
+        reportId,
+        '--output',
+        tempFile,
+      ];
+
+      try {
+        await executeAppknoxCommandStrict('reports', cmdArgs);
+
+        // Read the file content
+        const fileContent = fs.readFileSync(tempFile);
+
+        // Clean up temp file
+        fs.unlinkSync(tempFile);
+
+        // Return CSV as text
+        return {
+          content: [{
+            type: 'text',
+            text: fileContent.toString('utf-8'),
+          }],
+        };
+      } catch (error) {
+        // Clean up temp file on error if it exists
+        if (fs.existsSync(tempFile)) {
+          fs.unlinkSync(tempFile);
+        }
+        throw error;
+      }
     },
   },
   {
     name: 'appknox_dastcheck',
-    description: 'Check the status of a dynamic scan and display results when complete',
+    description: 'Check the status of a dynamic scan and display results when complete. Requires file_id (from appknox_files) and risk_threshold.',
     inputSchema: {
       type: 'object',
       properties: {
