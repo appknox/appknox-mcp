@@ -128,8 +128,8 @@ appknox_projects → project_id → appknox_files → file_id → appknox_analys
 ```
 "Who am I logged in as?"
 "List all my organizations"
-"Show me all my Android projects"
-"List iOS projects with package name containing 'com.example'"
+"Show me all my projects"
+"List projects with package name containing 'com.example'"
 ```
 
 ### Working with Projects and Files
