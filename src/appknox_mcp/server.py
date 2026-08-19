@@ -4,8 +4,8 @@ import sys
 
 from appknox_mcp.app import access_token, mcp
 
-# Tool modules register their @mcp.tool tools on import; they are wired in as
-# they land (see later changes).
+# Tool modules register their @mcp.tool tools on import.
+from appknox_mcp import findings, resolve, status  # noqa: E402, F401
 
 
 def main() -> None:

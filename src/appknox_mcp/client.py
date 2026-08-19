@@ -67,16 +67,6 @@ class AppknoxClient:
         payload = await self._get(f"{_V1}/projects", params={"package_name": package_name})
         return [Project.model_validate(row) for row in payload.get("results", [])]
 
-    async def list_open_va_analyses(
-        self, starting_after: int | None = None
-    ) -> list[dict[str, Any]]:
-        """One page of the open-VA listing (carries per-project KnoxIQ status)."""
-        params: dict[str, Any] = {"limit": 100}
-        if starting_after is not None:
-            params["starting_after"] = starting_after
-        payload = await self._get(f"{_V1}/projects/open_va_analyses", params=params)
-        return payload.get("results", [])
-
     # -- Analyses / KnoxIQ findings -----------------------------------------
 
     async def list_analyses(self, file_id: int) -> list[Analysis]:
