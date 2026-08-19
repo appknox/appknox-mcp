@@ -1,0 +1,14 @@
+{
+  "name": "appknox",
+  "description": "Appknox MCP server and Claude Code plugin (slash commands + fixer agent).",
+  "owner": {
+    "name": "Appknox"
+  },
+  "plugins": [
+    {
+      "name": "appknox",
+      "source": "./",
+      "description": "Appknox KnoxIQ fix-and-verify: fetch the vulnerabilities Appknox found in your app, fix them in your repo, verify with the finding's PoC, and re-scan."
+    }
+  ]
+}

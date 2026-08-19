@@ -1,0 +1,8 @@
+{
+  "name": "appknox",
+  "description": "Appknox KnoxIQ fix-and-verify: fetch the vulnerabilities Appknox found in your app, fix them in your repo, verify with the finding's PoC, and re-scan.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Appknox"
+  }
+}
