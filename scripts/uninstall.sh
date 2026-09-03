@@ -4,7 +4,7 @@
 #
 #   ./scripts/uninstall.sh [client]
 #
-# client ∈ cursor | codex | copilot | windsurf | vscode | claude | claude-desktop
+# client ∈ cursor | claude-desktop | codex | copilot | windsurf | vscode | claude
 #          (prompted if omitted)
 #
 # Only the `appknox` server entry is deleted; any other servers in the config are
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VALID_CLIENTS="cursor codex copilot windsurf vscode claude claude-desktop"
+VALID_CLIENTS="cursor claude-desktop codex copilot windsurf vscode claude"
 
 info()  { printf '  %s\n' "$1"; }
 step()  { printf '\n\033[1m▸ %s\033[0m\n' "$1"; }
@@ -32,7 +32,7 @@ step "Removing appknox from $CLIENT config"
 # Prefer uv (matches install), but fall back to a bare python3 so uninstall works
 # even if the environment is half torn down.
 if command -v uv >/dev/null 2>&1; then
-  uv run --directory "$REPO_DIR" python "$REPO_DIR/scripts/configure_mcp.py" \
+  uv run --no-project --directory "$REPO_DIR" python "$REPO_DIR/scripts/configure_mcp.py" \
     --client "$CLIENT" --cwd "$PWD" --remove
 else
   python3 "$REPO_DIR/scripts/configure_mcp.py" --client "$CLIENT" --cwd "$PWD" --remove

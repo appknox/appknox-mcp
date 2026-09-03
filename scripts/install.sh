@@ -83,12 +83,7 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 info "✓ uv found: $(command -v uv)"
 
-# ---- 2. sync dependencies ---------------------------------------------------
-step "Installing dependencies (uv sync)"
-( cd "$REPO_DIR" && uv sync )
-info "✓ Dependencies installed"
-
-# ---- 3. choose clients ------------------------------------------------------
+# ---- 2. choose clients ------------------------------------------------------
 SELECTED=()       # clients we will auto-configure
 SHOW_GENERIC=0    # also print manual/generic steps
 
@@ -145,7 +140,7 @@ if [ "${#SELECTED[@]}" -eq 0 ] && [ "$SHOW_GENERIC" -eq 0 ]; then
   die "Nothing selected. Re-run and pick at least one client (or 'm' for manual steps)."
 fi
 
-# ---- 4. credentials (only if we're writing at least one config) -------------
+# ---- 3. credentials (only if we're writing at least one config) -------------
 # No default base URL: white-labeled Appknox deployments use a different host
 # than the standard one, so guessing wrong here would silently point a
 # customer's agent at the wrong instance. Always ask.
@@ -172,7 +167,7 @@ if [ "${#SELECTED[@]}" -gt 0 ]; then
   info "✓ Using base URL: $BASE_URL"
 fi
 
-# ---- 5. write each selected client's config ---------------------------------
+# ---- 4. write each selected client's config ---------------------------------
 # Project-scoped configs (claude/.mcp.json, vscode/.vscode/mcp.json) hold the
 # token in the CURRENT repo — keep them out of git.
 ensure_gitignored() {
@@ -206,7 +201,9 @@ install_claude_plugin() {
 
 for CLIENT in "${SELECTED[@]}"; do
   step "Configuring $(client_label "$CLIENT")"
-  uv run --directory "$REPO_DIR" python "$REPO_DIR/scripts/configure_mcp.py" \
+  # --no-project: configure_mcp.py is stdlib-only, so this needs a compatible
+  # interpreter, not the server's runtime deps — skip syncing them.
+  uv run --no-project --directory "$REPO_DIR" python "$REPO_DIR/scripts/configure_mcp.py" \
     --client "$CLIENT" --repo "$REPO_DIR" --base-url "$BASE_URL" --cwd "$PWD"
   case "$CLIENT" in
     claude) ensure_gitignored ".mcp.json"; install_claude_plugin ;;
@@ -215,7 +212,7 @@ for CLIENT in "${SELECTED[@]}"; do
   info "→ $(client_hint "$CLIENT")"
 done
 
-# ---- 6. generic / manual steps for unknown clients --------------------------
+# ---- 5. generic / manual steps for unknown clients --------------------------
 if [ "$SHOW_GENERIC" -eq 1 ]; then
   step "Manual setup (any other MCP client)"
   cat <<EOF
@@ -239,7 +236,7 @@ if [ "$SHOW_GENERIC" -eq 1 ]; then
 EOF
 fi
 
-# ---- 7. done ----------------------------------------------------------------
+# ---- 6. done ----------------------------------------------------------------
 step "Done"
 if [ "${#SELECTED[@]}" -gt 0 ]; then
   info "Configured: ${SELECTED[*]}"

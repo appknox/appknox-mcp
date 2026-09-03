@@ -10,7 +10,7 @@
     .\scripts\uninstall.ps1 cursor
 
 .NOTES
-    client in cursor | codex | copilot | windsurf | vscode | claude | claude-desktop
+    client in cursor | claude-desktop | codex | copilot | windsurf | vscode | claude
     (prompted if omitted)
 
     Only the `appknox` server entry is deleted; any other servers in the config
@@ -25,7 +25,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RepoDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$ValidClients = @("cursor", "codex", "copilot", "windsurf", "vscode", "claude", "claude-desktop")
+$ValidClients = @("cursor", "claude-desktop", "codex", "copilot", "windsurf", "vscode", "claude")
 
 function Write-Info($msg) { Write-Host "  $msg" }
 function Write-Step($msg) { Write-Host "`n▸ $msg" -ForegroundColor White }
@@ -44,7 +44,7 @@ Write-Step "Removing appknox from $Client config"
 # Prefer uv (matches install), but fall back to a bare python so uninstall works
 # even if the environment is half torn down.
 if (Get-Command uv -ErrorAction SilentlyContinue) {
-    uv run --directory $RepoDir python "$RepoDir\scripts\configure_mcp.py" `
+    uv run --no-project --directory $RepoDir python "$RepoDir\scripts\configure_mcp.py" `
         --client $Client --cwd $PWD --remove
 } else {
     python "$RepoDir\scripts\configure_mcp.py" --client $Client --cwd $PWD --remove
