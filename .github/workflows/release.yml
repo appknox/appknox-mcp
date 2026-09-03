@@ -6,9 +6,12 @@ name: Build & Release Wheel
 # attached — so you can `uv tool install <release-wheel-url>` and test the real
 # install path.
 #
-# Publishing to TestPyPI/PyPI is a SEPARATE workflow (publish.yml) that only
-# fires once the release created here is actually published — see that file
-# for the one-time Trusted Publishing setup it needs.
+# Publishing to TestPyPI/PyPI is a SEPARATE workflow (publish.yml) that
+# triggers off THIS workflow's completion (not the `release` event directly
+# — GitHub won't cascade an event created by this job's own GITHUB_TOKEN into
+# another workflow) and only publishes if this run succeeded. See that file
+# for the one-time Trusted Publishing setup it needs, and note that a release
+# published by hand (not via this workflow) will NOT trigger it.
 on:
   workflow_dispatch:
     inputs:
