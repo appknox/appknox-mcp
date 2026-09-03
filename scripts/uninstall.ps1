@@ -10,7 +10,7 @@
     .\scripts\uninstall.ps1 cursor
 
 .NOTES
-    client in cursor | codex | windsurf | vscode | claude | claude-desktop
+    client in cursor | codex | copilot | windsurf | vscode | claude | claude-desktop
     (prompted if omitted)
 
     Only the `appknox` server entry is deleted; any other servers in the config
@@ -25,7 +25,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RepoDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$ValidClients = @("cursor", "codex", "windsurf", "vscode", "claude", "claude-desktop")
+$ValidClients = @("cursor", "codex", "copilot", "windsurf", "vscode", "claude", "claude-desktop")
 
 function Write-Info($msg) { Write-Host "  $msg" }
 function Write-Step($msg) { Write-Host "`n▸ $msg" -ForegroundColor White }

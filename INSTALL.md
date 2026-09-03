@@ -22,11 +22,20 @@ Then ensure `~/.local/bin` is on PATH (the installer usually handles this).
 
 ## 1. Install the server as a global tool
 
-**You (the agent) run these commands** — the user doesn't. Pick the first source
-that works; all produce a location-independent `appknox-mcp` command on PATH
-(usually `~/.local/bin/appknox-mcp`).
+**You (the agent) run these commands** — the user doesn't. Try them **in order,
+stopping at the first that works**; all produce a location-independent
+`appknox-mcp` command on PATH (usually `~/.local/bin/appknox-mcp`).
 
-**a) From a released wheel (preferred once releases exist).**
+**a) From PyPI (preferred — try this first).**
+```bash
+uv tool install appknox-mcp
+```
+This fails with a "not found" style error until the package is actually
+published (tracked by `.github/workflows/publish.yml` in this repo) — that's
+expected for now, just fall through to (b). Once it's live, this is the only
+step that ever runs.
+
+**b) From a released wheel.**
 The repo is **private for now**, so download the wheel with the GitHub CLI (it
 uses the user's existing `gh`/GitHub auth), then install the local file:
 
@@ -39,13 +48,13 @@ version; omit it for the latest. **When the repo is public**, skip `gh` entirely
 and install straight from the asset URL:
 `uv tool install "https://github.com/appknox/appknox-mcp/releases/latest/download/appknox_mcp-<version>-py3-none-any.whl"`.
 
-**b) From git (no release needed).**
+**c) From git (no release needed).**
 ```bash
-uv tool install "git+ssh://git@github.com/appknox/appknox-mcp@main"   # private: uses the user's SSH key
-# public: uv tool install "git+https://github.com/appknox/appknox-mcp@main"
+uv tool install "git+ssh://git@github.com/appknox/appknox-mcp@develop"   # private: uses the user's SSH key
+# public: uv tool install "git+https://github.com/appknox/appknox-mcp@develop"
 ```
 
-**c) From a local checkout** (if the user already cloned it):
+**d) From a local checkout** (if the user already cloned it):
 `uv tool install /path/to/appknox-mcp`.
 
 Then verify — if this prints a path, the server is installed and no repo folder is
@@ -55,8 +64,9 @@ needed afterward (nothing to keep or that can move):
 command -v appknox-mcp
 ```
 
-To update later: `uv tool upgrade appknox-mcp` (git/local sources) or re-run the
-`gh release download` + `uv tool install --reinstall` step for a newer wheel.
+To update later: `uv tool upgrade appknox-mcp` (works regardless of which
+source it was originally installed from) or re-run the `gh release download` +
+`uv tool install --reinstall` step for a newer wheel.
 
 ## 2. Ask the user for credentials
 
@@ -64,8 +74,10 @@ Prompt the user for three things (from Appknox dashboard → **Service Accounts*
 
 1. **Access Key ID**
 2. **Secret Access Key**
-3. **Base URL** — offer `https://sherlock-mcp.staging.appknox.io` as the default
-   (the KnoxIQ beta host); accept Enter to take it.
+3. **Base URL** — the API host for their Appknox instance. Don't assume a
+   default: white-labeled deployments use a different host, so ask rather than
+   guess (their dashboard has it if they're unsure; Appknox's own KnoxIQ beta
+   host is `https://sherlock-mcp.staging.appknox.io`, for reference only).
 
 Combine the first two into the token the server expects:
 `APPKNOX_ACCESS_TOKEN = "<Access Key ID>:<Secret Access Key>"` (a single colon
@@ -99,12 +111,43 @@ Key is `mcpServers`. Files:
       "command": "appknox-mcp",
       "env": {
         "APPKNOX_ACCESS_TOKEN": "<Access Key ID>:<Secret Access Key>",
-        "APPKNOX_BASE_URL": "https://sherlock-mcp.staging.appknox.io"
+        "APPKNOX_BASE_URL": "<your Appknox base URL>"
       }
     }
   }
 }
 ```
+
+### GitHub Copilot CLI — `~/.copilot/mcp-config.json`
+
+Key is `mcpServers` too, but each entry additionally needs `"type": "local"`
+(Copilot CLI's name for a stdio server) and a `"tools"` allowlist — omit
+`"tools"` and the server starts but exposes none of its tools:
+
+```json
+{
+  "mcpServers": {
+    "appknox": {
+      "type": "local",
+      "command": "appknox-mcp",
+      "args": [],
+      "env": {
+        "APPKNOX_ACCESS_TOKEN": "<Access Key ID>:<Secret Access Key>",
+        "APPKNOX_BASE_URL": "<your Appknox base URL>"
+      },
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+The path honors `$COPILOT_HOME` if set (defaults to `~/.copilot`). Verify with
+`/mcp` inside a `copilot` session.
+
+> **Note:** this is the standalone **GitHub Copilot CLI**, not Copilot Chat
+> inside VS Code — that one is configured via the **VS Code** section below
+> (VS Code's `.vscode/mcp.json` is shared by both plain VS Code MCP support and
+> Copilot Chat).
 
 ### VS Code — `.vscode/mcp.json`
 
@@ -134,7 +177,7 @@ args = []
 
 [mcp_servers.appknox.env]
 APPKNOX_ACCESS_TOKEN = "<Access Key ID>:<Secret Access Key>"
-APPKNOX_BASE_URL = "https://sherlock-mcp.staging.appknox.io"
+APPKNOX_BASE_URL = "<your Appknox base URL>"
 ```
 
 > If the user cloned this repo, you can instead let the bundled writer do the
@@ -173,9 +216,11 @@ is selected.
 ## 4. Restart and verify
 
 MCP servers are spawned when the client starts, so **restart the client** (fully
-quit Claude Desktop with Cmd+Q; restart the Codex session; reopen Cursor). Then:
+quit Claude Desktop with Cmd+Q; restart the Codex or Copilot CLI session; reopen
+Cursor). Then:
 
-- Claude Code / Codex: run `/mcp` — you should see `appknox` with ~9 tools.
+- Claude Code / Codex / Copilot CLI: run `/mcp` — you should see `appknox` with
+  ~9 tools.
 - Claude Code only: run `claude plugin list` — you should see `appknox@appknox`
   enabled; try `/appknox:triage` to confirm the slash commands loaded.
 - Ask: *"list the Appknox tools"* — the agent should see `resolve_latest_file`,

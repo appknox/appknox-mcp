@@ -91,6 +91,37 @@ def test_codex_toml_append_and_idempotent(tmp_path: Path) -> None:
     assert path.read_text().count("[mcp_servers.appknox]") == 1
 
 
+def test_copilot_entry_gets_type_local_and_tools(tmp_path: Path) -> None:
+    path = tmp_path / "mcp-config.json"
+    configure_mcp._write_json(
+        path,
+        "mcpServers",
+        configure_mcp._json_entry(REPO, TOKEN, BASE_URL),
+        extra={"type": "local", "tools": ["*"]},
+    )
+    entry = json.loads(path.read_text())["mcpServers"]["appknox"]
+    assert entry["type"] == "local"
+    assert entry["tools"] == ["*"]
+
+
+def test_target_copilot_path_defaults_to_home(monkeypatch) -> None:
+    monkeypatch.delenv("COPILOT_HOME", raising=False)
+    home, cwd = Path("/home/x"), Path("/repo")
+    assert configure_mcp._target("copilot", home, cwd) == (
+        "copilot",
+        home / ".copilot" / "mcp-config.json",
+    )
+
+
+def test_target_copilot_path_honors_copilot_home(monkeypatch) -> None:
+    monkeypatch.setenv("COPILOT_HOME", "/custom/copilot")
+    home, cwd = Path("/home/x"), Path("/repo")
+    assert configure_mcp._target("copilot", home, cwd) == (
+        "copilot",
+        Path("/custom/copilot") / "mcp-config.json",
+    )
+
+
 def test_target_unknown_client_raises() -> None:
     with pytest.raises(SystemExit, match="Unknown client"):
         configure_mcp._target("emacs", Path("/home/x"), Path("/repo"))
