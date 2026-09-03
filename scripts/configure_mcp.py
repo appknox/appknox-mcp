@@ -15,6 +15,10 @@ from pathlib import Path
 
 SERVER_KEY = "appknox"
 TOKEN_ENV = "APPKNOX_ACCESS_TOKEN"
+# Matches both [mcp_servers.appknox] and [mcp_servers.appknox.env] — the single
+# definition both _write_codex_toml and _remove_codex_toml key off of, so they
+# can't drift apart on what counts as "the block".
+_CODEX_BLOCK_PREFIX = f"[mcp_servers.{SERVER_KEY}"
 
 
 def _claude_desktop_path(home: Path) -> Path:
@@ -26,26 +30,13 @@ def _claude_desktop_path(home: Path) -> Path:
     return home / ".config" / "Claude" / "claude_desktop_config.json"
 
 
-def _launch_args(repo_dir: str) -> list[str]:
-    """Return the argv that starts the stdio server via uv."""
-    return ["run", "--directory", repo_dir, "appknox-mcp"]
-
-
-def _entry(command: str, args: list[str], token: str, base_url: str) -> dict:
-    """Build a server entry dict for the given launch command/args."""
-    return {
-        "command": command,
-        "args": args,
-        "env": {
-            "APPKNOX_ACCESS_TOKEN": token,
-            "APPKNOX_BASE_URL": base_url,
-        },
-    }
-
-
 def _json_entry(repo_dir: str, token: str, base_url: str) -> dict:
     """Run-from-source entry: launches the server via ``uv run --directory <repo>``."""
-    return _entry("uv", _launch_args(repo_dir), token, base_url)
+    return {
+        "command": "uv",
+        "args": ["run", "--directory", repo_dir, "appknox-mcp"],
+        "env": {"APPKNOX_ACCESS_TOKEN": token, "APPKNOX_BASE_URL": base_url},
+    }
 
 
 def _copilot_home(home: Path) -> Path:
@@ -60,7 +51,11 @@ def _tool_entry(token: str, base_url: str) -> dict:
     Used after ``uv tool install`` so the config has no dependency on the repo's
     location (nothing to break if the checkout moves).
     """
-    return _entry("appknox-mcp", [], token, base_url)
+    return {
+        "command": "appknox-mcp",
+        "args": [],
+        "env": {"APPKNOX_ACCESS_TOKEN": token, "APPKNOX_BASE_URL": base_url},
+    }
 
 
 def _write_json(path: Path, top_key: str, entry: dict, extra: dict | None = None) -> None:
@@ -92,15 +87,15 @@ def _write_codex_toml(path: Path, entry: dict) -> None:
     """
     args = ", ".join(f'"{a}"' for a in entry["args"])
     block = (
-        f"[mcp_servers.{SERVER_KEY}]\n"
+        f"{_CODEX_BLOCK_PREFIX}]\n"
         f'command = "{entry["command"]}"\n'
         f"args = [{args}]\n\n"
-        f"[mcp_servers.{SERVER_KEY}.env]\n"
+        f"{_CODEX_BLOCK_PREFIX}.env]\n"
         f'APPKNOX_ACCESS_TOKEN = "{entry["env"]["APPKNOX_ACCESS_TOKEN"]}"\n'
         f'APPKNOX_BASE_URL = "{entry["env"]["APPKNOX_BASE_URL"]}"\n'
     )
     existing = path.read_text() if path.exists() else ""
-    if f"[mcp_servers.{SERVER_KEY}" in existing:
+    if _CODEX_BLOCK_PREFIX in existing:
         print(
             f"⚠ {path} already has an '{SERVER_KEY}' block — leaving it untouched.\n"
             f"  To update, delete the [mcp_servers.{SERVER_KEY}] and "
@@ -141,7 +136,7 @@ def _remove_codex_toml(path: Path) -> None:
         stripped = line.strip()
         if stripped.startswith("["):
             # A new table header ends any block we were skipping.
-            skipping = stripped.startswith(f"[mcp_servers.{SERVER_KEY}")
+            skipping = stripped.startswith(_CODEX_BLOCK_PREFIX)
             removed = removed or skipping
         if not skipping:
             kept.append(line)
@@ -155,18 +150,17 @@ def _remove_codex_toml(path: Path) -> None:
 
 def _target(client: str, home: Path, cwd: Path) -> tuple[str, Path]:
     """Map a client name to (kind, config path). kind is 'json'|'vscode'|'codex'|'copilot'."""
-    home_json = {
+    table = {
+        # home-scoped
         "cursor": ("json", home / ".cursor" / "mcp.json"),
         "windsurf": ("json", home / ".codeium" / "windsurf" / "mcp_config.json"),
         "claude-desktop": ("json", _claude_desktop_path(home)),
         "copilot": ("copilot", _copilot_home(home) / "mcp-config.json"),
-    }
-    project = {
+        # project-scoped
         "claude": ("json", cwd / ".mcp.json"),
         "vscode": ("vscode", cwd / ".vscode" / "mcp.json"),
         "codex": ("codex", home / ".codex" / "config.toml"),
     }
-    table = {**home_json, **project}
     if client not in table:
         raise SystemExit(f"✗ Unknown client '{client}'. Choose: {', '.join(sorted(table))}")
     return table[client]

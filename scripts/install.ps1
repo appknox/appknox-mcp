@@ -90,13 +90,7 @@ if (-not $uv) {
 }
 Write-Info "OK uv found: $($uv.Source)"
 
-# ---- 2. sync dependencies ---------------------------------------------------
-Write-Step "Installing dependencies (uv sync)"
-Push-Location $RepoDir
-try { uv sync } finally { Pop-Location }
-Write-Info "OK Dependencies installed"
-
-# ---- 3. choose clients ------------------------------------------------------
+# ---- 2. choose clients ------------------------------------------------------
 $Selected = @()
 $ShowGeneric = $false
 
@@ -140,7 +134,7 @@ if ($Selected.Count -eq 0 -and -not $ShowGeneric) {
     Die "Nothing selected. Re-run and pick at least one client (or 'm' for manual steps)."
 }
 
-# ---- 4. credentials (only if we're writing at least one config) -------------
+# ---- 3. credentials (only if we're writing at least one config) -------------
 # No default base URL: white-labeled Appknox deployments use a different host
 # than the standard one, so guessing wrong here would silently point a
 # customer's agent at the wrong instance. Always ask.
@@ -166,7 +160,7 @@ if ($Selected.Count -gt 0) {
     Write-Info "OK Using base URL: $BaseUrl"
 }
 
-# ---- 5. write each selected client's config ---------------------------------
+# ---- 4. write each selected client's config ---------------------------------
 # Project-scoped configs (claude/.mcp.json, vscode/.vscode/mcp.json) hold the
 # token in the CURRENT repo - keep them out of git.
 function Add-Gitignored($entry) {
@@ -200,14 +194,16 @@ function Install-ClaudePlugin {
 
 foreach ($Client in $Selected) {
     Write-Step "Configuring $(Get-ClientLabel $Client)"
-    uv run --directory $RepoDir python "$RepoDir\scripts\configure_mcp.py" `
+    # --no-project: configure_mcp.py is stdlib-only, so this needs a compatible
+    # interpreter, not the server's runtime deps - skip syncing them.
+    uv run --no-project --directory $RepoDir python "$RepoDir\scripts\configure_mcp.py" `
         --client $Client --repo $RepoDir --base-url $BaseUrl --cwd $PWD
     if ($Client -eq "claude") { Add-Gitignored ".mcp.json"; Install-ClaudePlugin }
     if ($Client -eq "vscode") { Add-Gitignored ".vscode/mcp.json" }
     Write-Info "-> $(Get-ClientHint $Client)"
 }
 
-# ---- 6. generic / manual steps for unknown clients --------------------------
+# ---- 5. generic / manual steps for unknown clients --------------------------
 if ($ShowGeneric) {
     Write-Step "Manual setup (any other MCP client)"
     Write-Host @"
@@ -231,7 +227,7 @@ if ($ShowGeneric) {
 "@
 }
 
-# ---- 7. done ----------------------------------------------------------------
+# ---- 6. done ----------------------------------------------------------------
 Write-Step "Done"
 if ($Selected.Count -gt 0) {
     Write-Info "Configured: $($Selected -join ', ')"
