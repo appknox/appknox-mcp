@@ -151,6 +151,25 @@ async def test_min_exploitability_drops_low_scoring_analyses(fake_client) -> Non
     assert [r["id"] for r in rows] == [1]
 
 
+async def test_list_analyses_sorts_by_exploitability_then_risk(fake_client) -> None:
+    fake_client(
+        analyses={
+            1: [
+                _analysis(1, computed_risk=4, exploitability_score=2.0),  # Critical, low exploit
+                _analysis(2, computed_risk=2, exploitability_score=9.0),  # Medium, high exploit
+                _analysis(3, computed_risk=3, exploitability_score=9.0),  # High, tied exploit
+                _analysis(4, computed_risk=1, exploitability_score=None),  # Low, no score
+            ]
+        }
+    )
+
+    rows = await findings.list_analyses(file_id=1)
+
+    # Exploitability score wins first (9.0 beats 2.0 beats missing/0.0); a tie
+    # (id 2 vs 3) breaks on computed_risk (High beats Medium) — never on id order.
+    assert [r["id"] for r in rows] == [3, 2, 1, 4]
+
+
 async def test_include_exploitability_false_drops_fields(fake_client) -> None:
     fake_client(analyses={1: [_analysis(1, 4, exploitability_score=9.0)]})
 

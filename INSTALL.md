@@ -2,10 +2,18 @@
 
 This document is written so an **AI coding agent** (Claude Code, Cursor, Codex, …)
 can install and wire up the Appknox MCP server end-to-end. A human can follow it
-too. It needs no clone of this repo — the server installs as a global command.
+too. It needs no clone of this repo — the server installs as a global command,
+and this exact file ships inside the package: once step 1 below is done, run
+`appknox-mcp --install-guide` any time to print it again.
 
 > **Agent:** if a user handed you this repo's URL (or this file) and said "install
-> it," you're in the right place — do the steps below in order. The only things to
+> it," you're in the right place — do the steps below in order. **First identify
+> which client you are actually running as** (Claude Code, Cursor, Codex, GitHub
+> Copilot CLI, VS Code, Windsurf, Claude Desktop, or something else) — you need
+> this for step 3 regardless, and it matters more once you reach the section
+> titled "Claude Code only": if you are not Claude Code, skip that entire
+> section (do not run its commands "just in case" or because it looked like the
+> next step in order) and go straight to the step after it. The only things to
 > ask the user for are their **Access Key ID + Secret Access Key** (step 2) and,
 > if it's unclear, **which client** to configure. Never print the secret back.
 
@@ -30,10 +38,15 @@ stopping at the first that works**; all produce a location-independent
 ```bash
 uv tool install appknox-mcp
 ```
-This fails with a "not found" style error until the package is actually
-published (tracked by `.github/workflows/publish.yml` in this repo) — that's
-expected for now, just fall through to (b). Once it's live, this is the only
-step that ever runs.
+Not live yet — while `appknox-mcp` is only on TestPyPI, install from there
+instead (needs `--extra-index-url` since deps like `fastmcp` aren't on
+TestPyPI, and `--index-strategy unsafe-best-match` to let `uv` resolve across
+both indexes):
+```bash
+uv tool install --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --index-strategy unsafe-best-match appknox-mcp
+```
+Once it's on real PyPI, switch to the plain command above and skip straight to
+verifying — only fall through to (b) if both of these fail.
 
 **b) From a released wheel.**
 The repo is **private for now**, so download the wheel with the GitHub CLI (it
@@ -191,6 +204,13 @@ For `claude` (`.mcp.json`) and `vscode` (`.vscode/mcp.json`), which live in the
 app repo and now contain the token, add the file to that repo's `.gitignore`.
 
 ### Claude Code only: the plugin (slash commands + fixer agent)
+
+> **STOP — agent, check this first:** this section applies ONLY if you are
+> Claude Code. If you are Copilot CLI, Cursor, Codex, VS Code, Windsurf, Claude
+> Desktop, or anything else, **skip this entire section** — do not run
+> `claude plugin ...` commands (the `claude` CLI likely isn't even installed in
+> your environment, and this step is not part of your setup at all) — and
+> continue at "4. Restart and verify" below.
 
 The MCP config above gets Claude Code the **tools**, but not `/appknox:triage`,
 `/appknox:fix`, `/appknox:upload`, `/appknox:verify`, or the `appknox-fixer`

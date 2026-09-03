@@ -69,12 +69,16 @@ async def list_analyses(
     `exploitability` — every filter below works off that single call, no
     per-analysis fetches.
 
+    Always sorted exploitability-first, severity as tiebreak (KnoxIQ's signal
+    for what to fix first) — present rows in this order, don't re-sort by id.
+
     `min_risk` filters on `computed_risk` (-1 Unknown, 0 Passed, 1 Low, 2 Medium,
     3 High, 4 Critical). `min_exploitability` filters on `exploitability_score`
     (the highest KnoxIQ exploitability score among an analysis's findings). Set
     `include_exploitability=False` to drop `exploitability_score`/
     `exploitability_likelihood` from the response (e.g. for a compact risk-only
-    browse of a file with many analyses).
+    browse of a file with many analyses) — leave it at the default otherwise,
+    since exploitability is what makes the sort order meaningful.
     """
     analyses = await client.list_analyses(file_id)
     if min_risk is not None:
@@ -89,6 +93,18 @@ async def list_analyses(
             for a in analyses
             if (a.exploitability_score or 0.0) >= min_exploitability
         ]
+    # Exploitability first, severity as tiebreak — KnoxIQ's signal for what to
+    # fix first (see instructions.py step 3). Sorted here, not left to each
+    # client's prompt-following, so every agent gets the same priority order
+    # regardless of how well it follows the free-text workflow instructions.
+    analyses = sorted(
+        analyses,
+        key=lambda a: (
+            a.exploitability_score or 0.0,
+            a.computed_risk if a.computed_risk is not None else -1,
+        ),
+        reverse=True,
+    )
     return [_to_row(a, include_exploitability) for a in analyses]
 
 

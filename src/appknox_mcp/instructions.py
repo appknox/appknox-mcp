@@ -22,6 +22,12 @@ Tools — generic: resolve_latest_file, get_file_info, list_analyses, upload_bin
 KnoxIQ (require KnoxIQ enabled): knoxiq_get_scan_status, knoxiq_get_fix_plan,
 knoxiq_prepare_fix, knoxiq_verify_fixes.
 
+Always call these as tools, never as a hand-written HTTP request (curl or
+otherwise) against the Appknox API directly — even if you can see the access
+token in your environment. A hand-built request bypasses this server's error
+handling, pagination, and response shaping, and produces subtly different
+results and errors than the tool it was supposed to replace.
+
 1. RESOLVE THE BUILD. Get the file_id to work on and confirm it with the user —
    never silently pick one.
    - file_id given: confirm it's current (get_file_info -> resolve_latest_file on
@@ -36,11 +42,16 @@ knoxiq_prepare_fix, knoxiq_verify_fixes.
    message and stop — scan running, KnoxIQ not enabled, or build predates KnoxIQ.
    Never present an empty findings list as "no vulnerabilities".
 
-3. TRIAGE. list_analyses(file_id, min_risk=1) — lists all analyses and enriches
-   each with KnoxIQ exploitability. Present two breakdowns, exploitability first
-   (it is KnoxIQ's signal for what to fix first): Critical/High/Medium/Low by
-   exploitability_likelihood, then the same by severity. Rank the table by
-   exploitability score, then severity.
+3. TRIAGE. list_analyses(file_id, min_risk=1) — lists all analyses, enriched
+   with KnoxIQ exploitability and already sorted exploitability-first, severity
+   as tiebreak (it is KnoxIQ's signal for what to fix first) — present rows in
+   that order, don't re-sort by id. Show `exploitability_likelihood` (and
+   `exploitability_score`) as its own column on every row you display, not just
+   as the sort/grouping key — a table with severity but no exploitability
+   column is an incomplete triage view, whatever surface you're rendering it
+   on (a chat table, a slash-command's formatted output, anything else). Also
+   present a Critical/High/Medium/Low breakdown by exploitability_likelihood,
+   then the same by severity.
 
 4. SELECT. Never fix without an explicit choice from the user — suggest a
    default ("fix all highly exploitable") but wait for their reply, then resolve

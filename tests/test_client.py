@@ -22,6 +22,33 @@ async def test_error_raises_appknox_api_error() -> None:
         await client.get_file(5)
 
 
+async def test_error_message_surfaces_status_and_detail_key() -> None:
+    client = _client(lambda request: httpx.Response(401, json={"detail": "Invalid token"}))
+    with pytest.raises(AppknoxAPIError, match="401.*Invalid token"):
+        await client.get_file(5)
+
+
+async def test_error_message_surfaces_error_key() -> None:
+    client = _client(lambda request: httpx.Response(404, json={"error": "Not Found (404)"}))
+    with pytest.raises(AppknoxAPIError, match="404.*Not Found"):
+        await client.get_file(5)
+
+
+async def test_error_message_falls_back_to_raw_body_for_non_json() -> None:
+    client = _client(lambda request: httpx.Response(502, text="Bad Gateway"))
+    with pytest.raises(AppknoxAPIError, match="502.*Bad Gateway"):
+        await client.get_file(5)
+
+
+async def test_request_error_surfaces_exception_text() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("connection timed out")
+
+    client = _client(handler)
+    with pytest.raises(AppknoxAPIError, match="connection timed out"):
+        await client.get_file(5)
+
+
 async def test_list_projects_returns_results() -> None:
     client = _client(
         lambda request: httpx.Response(200, json={"results": [{"id": 1}], "next": None})
