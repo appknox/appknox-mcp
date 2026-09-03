@@ -19,35 +19,19 @@ Two ways: **ask your agent** (no clone, recommended) or **run the guided script*
 <summary><strong>Option A — Ask your agent (no clone)</strong></summary>
 
 If you already have an AI coding agent running (Claude Code, Cursor, Codex, …),
-tell it to install this — it uses its own shell + file tools to install the server
-and write your MCP config. **Paste this prompt:**
+paste this — the install guide bundled in the package has every remaining step
+(credentials, client config, the Claude Code plugin, restarting), so there's
+nothing else to keep in sync here:
 
-> Install the Appknox KnoxIQ MCP server for me:
-> 1. If `uv` isn't installed, install it (https://astral.sh/uv).
-> 2. Install `appknox-mcp` as a global tool. Try, in order, stopping at the
->    first that works:
->    a. `uv tool install appknox-mcp` (from PyPI)
->    b. `gh release download --repo appknox/appknox-mcp --pattern '*.whl' --dir /tmp/appknox-mcp && uv tool install /tmp/appknox-mcp/*.whl`
->    c. `uv tool install "git+ssh://git@github.com/appknox/appknox-mcp@develop"`
->    Verify with `command -v appknox-mcp`.
-> 3. Ask me for my Appknox **Access Key ID**, **Secret Access Key**, and
->    **base URL** — the API host for my Appknox instance. Don't assume a
->    default: white-labeled deployments use a different host, so ask rather
->    than guess (my dashboard has it if I'm not sure).
-> 4. Add an `appknox` MCP server to this client's config: `command: "appknox-mcp"`, env `APPKNOX_ACCESS_TOKEN=<id>:<secret>` and `APPKNOX_BASE_URL=<url>`. Full per-client shapes are in INSTALL.md.
-> 5. If this client is **Claude Code**, also install the plugin — it's the only
->    way to get the `/appknox:*` slash commands and the fixer agent (an MCP
->    entry alone does not add them): `claude plugin marketplace add
->    appknox/appknox-mcp` then `claude plugin install appknox@appknox -y`.
-> 6. Tell me to restart the client — MCP servers only load at startup.
+```
+Install the appknox-mcp MCP server for me:
+1. `uv tool install --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --index-strategy unsafe-best-match appknox-mcp`
+   (once it's on real PyPI, just: `uv tool install appknox-mcp`)
+2. Run `appknox-mcp --install-guide` and follow it exactly.
+```
 
-The agent installs it, asks for your credentials, writes the config, and you
-restart — done. Installed as a global tool, so the config has no dependency on any
-folder; update later with `uv tool upgrade appknox-mcp`.
-
-> **Once `appknox-mcp` is live on PyPI**, step 2a is the only one that ever
-> runs — 2b/2c are dormant fallbacks for right now, while the package isn't
-> published yet. Nothing here needs editing when that changes.
+That's it — the agent installs it, reads the guide, asks you for credentials,
+writes the config, and tells you to restart the client.
 
 </details>
 

@@ -32,6 +32,25 @@ def _next_page_params(next_url: str) -> dict[str, str]:
     return {key: values[0] for key, values in parse_qs(query).items()}
 
 
+def _error_detail(response: httpx.Response) -> str:
+    """Pull a short, human-readable reason out of an error response body.
+
+    Appknox's API returns different shapes for different failures — e.g.
+    ``{"detail": "Invalid token"}`` for auth, ``{"error": "Not Found (404)"}``
+    for a missing resource — so check the common keys before falling back to
+    the raw (truncated) body.
+    """
+    try:
+        body = response.json()
+    except ValueError:
+        return response.text[:200]
+    if isinstance(body, dict):
+        for key in ("detail", "error", "message"):
+            if key in body:
+                return str(body[key])
+    return str(body)[:200]
+
+
 class AppknoxClient:
     """Async SDK for the Appknox public API — one method per endpoint, auth built in."""
 
@@ -144,6 +163,11 @@ class AppknoxClient:
         try:
             response = await self._http.request(method, path, params=params, json=json)
             response.raise_for_status()
-        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
-            raise AppknoxAPIError(f"{method} {path} failed") from exc
+        except httpx.HTTPStatusError as exc:
+            raise AppknoxAPIError(
+                f"{method} {path} failed: {exc.response.status_code} "
+                f"{_error_detail(exc.response)}"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise AppknoxAPIError(f"{method} {path} failed: {exc}") from exc
         return response.json()
