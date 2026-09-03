@@ -5,6 +5,10 @@ name: Build & Release Wheel
 # (not the source tree), then creates a GitHub Release with the artifacts
 # attached — so you can `uv tool install <release-wheel-url>` and test the real
 # install path.
+#
+# Publishing to TestPyPI/PyPI is a SEPARATE workflow (publish.yml) that only
+# fires once the release created here is actually published — see that file
+# for the one-time Trusted Publishing setup it needs.
 on:
   workflow_dispatch:
     inputs:

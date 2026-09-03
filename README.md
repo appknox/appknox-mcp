@@ -5,8 +5,8 @@ agent to [Appknox](https://www.appknox.com) KnoxIQ, so it can **fetch the
 vulnerabilities Appknox found in your app, fix them in your repo, and verify each
 fix with the finding's own proof-of-concept** — without leaving your editor.
 
-Works with **Claude Code**, **Claude Desktop**, **Codex**, **Cursor**, Windsurf,
-and VS Code.
+Works with **Claude Code**, **Claude Desktop**, **Codex**, **GitHub Copilot CLI**,
+**Cursor**, Windsurf, and VS Code (including VS Code's Copilot Chat).
 
 ---
 
@@ -22,20 +22,27 @@ and write your MCP config. **Paste this prompt:**
 
 > Install the Appknox KnoxIQ MCP server for me:
 > 1. If `uv` isn't installed, install it (https://astral.sh/uv).
-> 2. Install the server as a global tool. Try, in order:
->    `gh release download --repo appknox/appknox-mcp --pattern '*.whl' --dir /tmp/appknox-mcp && uv tool install /tmp/appknox-mcp/*.whl`
->    — else `uv tool install "git+ssh://git@github.com/appknox/appknox-mcp@main"`. Verify with `command -v appknox-mcp`.
+> 2. Install `appknox-mcp` as a global tool. Try, in order, stopping at the
+>    first that works:
+>    a. `uv tool install appknox-mcp` (from PyPI)
+>    b. `gh release download --repo appknox/appknox-mcp --pattern '*.whl' --dir /tmp/appknox-mcp && uv tool install /tmp/appknox-mcp/*.whl`
+>    c. `uv tool install "git+ssh://git@github.com/appknox/appknox-mcp@main"`
+>    Verify with `command -v appknox-mcp`.
 > 3. Ask me for my Appknox **Access Key ID**, **Secret Access Key**, and **base URL** (default `https://sherlock-mcp.staging.appknox.io`).
-> 4. Add an `appknox` MCP server to this client's config: `command: "appknox-mcp"`, env `APPKNOX_ACCESS_TOKEN=<id>:<secret>` and `APPKNOX_BASE_URL=<url>`.
+> 4. Add an `appknox` MCP server to this client's config: `command: "appknox-mcp"`, env `APPKNOX_ACCESS_TOKEN=<id>:<secret>` and `APPKNOX_BASE_URL=<url>`. Full per-client shapes are in INSTALL.md.
 > 5. If this client is **Claude Code**, also install the plugin — it's the only
 >    way to get the `/appknox:*` slash commands and the fixer agent (an MCP
 >    entry alone does not add them): `claude plugin marketplace add
 >    appknox/appknox-mcp` then `claude plugin install appknox@appknox -y`.
-> 6. Tell me to restart the client.
+> 6. Tell me to restart the client — MCP servers only load at startup.
 
 The agent installs it, asks for your credentials, writes the config, and you
 restart — done. Installed as a global tool, so the config has no dependency on any
 folder; update later with `uv tool upgrade appknox-mcp`.
+
+> **Once `appknox-mcp` is live on PyPI**, step 2a is the only one that ever
+> runs — 2b/2c are dormant fallbacks for right now, while the package isn't
+> published yet. Nothing here needs editing when that changes.
 
 ### Option B — Guided script (auto-detects your clients)
 
@@ -86,9 +93,95 @@ touched. Restart the client afterwards.
 
 ---
 
+## Verify it's connected
+
+MCP servers only load at startup, so **restart the client first**, then check
+it picked up `appknox`:
+
+<details>
+<summary><strong>Claude Code</strong></summary>
+
+Run `/mcp` in a session inside the repo — you should see `appknox` listed with
+~9 tools. If you also installed the plugin, try `/appknox:triage` to confirm
+the slash commands loaded.
+</details>
+
+<details>
+<summary><strong>Claude Desktop</strong></summary>
+
+Fully quit (Cmd+Q) and reopen — it only reads config at launch. Then either:
+- click the hammer/tools icon in the chat input and look for `resolve_latest_file`,
+  `list_analyses`, etc., or
+- click **+** below the chat box → **Connectors**, or
+- go to **Settings → Developer** to see the server's status and logs.
+</details>
+
+<details>
+<summary><strong>Codex CLI</strong></summary>
+
+Restart the Codex session, then run `/mcp` — `appknox` should appear in the
+server list.
+</details>
+
+<details>
+<summary><strong>GitHub Copilot CLI</strong></summary>
+
+Restart your `copilot` session, then run `/mcp` inside it — or run
+`copilot mcp list` directly from your shell. Either should show `appknox`.
+</details>
+
+<details>
+<summary><strong>Cursor</strong></summary>
+
+Restart Cursor, then open **Settings → MCP**. `appknox` should show a green
+dot with a tool count next to it. (Green dot but 0 tools? Cursor caps tools at
+40 across *all* enabled servers combined — check what else you have enabled.)
+</details>
+
+<details>
+<summary><strong>Windsurf</strong></summary>
+
+Restart Windsurf, then click the **MCPs** icon in the top-right of the Cascade
+panel — `appknox` should show a green status indicator with its tools listed
+underneath.
+</details>
+
+<details>
+<summary><strong>VS Code (incl. Copilot Chat)</strong></summary>
+
+Reload the window (Command Palette → **Developer: Reload Window**), then
+Command Palette → **MCP: List Servers** — `appknox` should appear with
+start/stop/restart options. Once started, open Copilot Chat and check the
+tools icon next to the model picker — `appknox`'s tools should be listed and
+toggled on there.
+</details>
+
+---
+
 ## Usage
 
 Inside your app's repository, once the server is connected:
+
+### First run — resolving which build to check
+
+The tools work against a specific Appknox **file_id** (a scanned build). You
+don't need to look one up:
+
+- **Don't mention one** and the agent detects your app's `package_name` (and
+  Android/iOS platform) from the repo, resolves it to the latest scanned build
+  on Appknox, and tells you which build it found before doing anything else —
+  confirm it or point it at a different one.
+- **Already have a file_id** (e.g. checking an older build on purpose)? Just
+  say so — it's used directly, after a quick check that it's still current.
+
+```
+You:   Find and fix the Appknox vulnerabilities in this repo.
+Agent: No file_id given — I'll detect this app from the repo and use its
+       latest scanned build. Found com.appknox.demo (Android), latest is
+       file_id 48213 (v3.2.1, scanned 2 days ago). Use this one?
+You:   Yes.
+Agent: [checks scan readiness, then lists vulnerabilities by exploitability…]
+```
 
 ### Claude Code
 

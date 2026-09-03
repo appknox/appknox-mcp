@@ -4,7 +4,7 @@
 #
 #   ./scripts/uninstall.sh [client]
 #
-# client ∈ cursor | codex | windsurf | vscode | claude | claude-desktop
+# client ∈ cursor | codex | copilot | windsurf | vscode | claude | claude-desktop
 #          (prompted if omitted)
 #
 # Only the `appknox` server entry is deleted; any other servers in the config are
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VALID_CLIENTS="cursor codex windsurf vscode claude claude-desktop"
+VALID_CLIENTS="cursor codex copilot windsurf vscode claude claude-desktop"
 
 info()  { printf '  %s\n' "$1"; }
 step()  { printf '\n\033[1m▸ %s\033[0m\n' "$1"; }

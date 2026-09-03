@@ -5,7 +5,7 @@
 #   ./scripts/install.sh                 # auto-detect clients, then multi-select
 #   ./scripts/install.sh cursor codex    # install into the named clients directly
 #
-# Supported: cursor | claude-desktop | codex | windsurf | vscode | claude
+# Supported: cursor | claude-desktop | codex | copilot | windsurf | vscode | claude
 #
 # The access token is read from $APPKNOX_ACCESS_TOKEN, or prompted (never echoed,
 # never placed on the command line). Existing client configs are merged, not
@@ -15,7 +15,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEFAULT_BASE_URL="https://sherlock-mcp.staging.appknox.io"
 # Detection order = display order.
-ALL_CLIENTS=(cursor claude-desktop codex windsurf vscode claude)
+ALL_CLIENTS=(cursor claude-desktop codex copilot windsurf vscode claude)
 
 info()  { printf '  %s\n' "$1"; }
 step()  { printf '\n\033[1m▸ %s\033[0m\n' "$1"; }
@@ -27,6 +27,7 @@ client_label() {
     cursor)         echo "Cursor" ;;
     claude-desktop) echo "Claude Desktop" ;;
     codex)          echo "Codex CLI" ;;
+    copilot)        echo "GitHub Copilot CLI" ;;
     windsurf)       echo "Windsurf" ;;
     vscode)         echo "VS Code (project: this repo)" ;;
     claude)         echo "Claude Code (project: this repo)" ;;
@@ -39,6 +40,7 @@ client_hint() {
     cursor)         echo "Restart Cursor; enable 'appknox' under Settings → MCP if it's off." ;;
     claude-desktop) echo "Fully quit and reopen Claude Desktop (Cmd+Q) so it respawns MCP servers." ;;
     codex)          echo "Restart the Codex session; run /mcp to confirm 'appknox'." ;;
+    copilot)        echo "Restart the Copilot CLI session; run /mcp to confirm 'appknox'." ;;
     windsurf)       echo "Restart Windsurf; enable the server in the MCP panel if needed." ;;
     vscode)         echo "Reload VS Code; start the server from .vscode/mcp.json." ;;
     claude)         echo "Restart Claude Code in this repo; run /appknox:triage or /appknox:fix." ;;
@@ -51,6 +53,7 @@ is_present() {
     cursor)         [ -d "$HOME/.cursor" ] || [ -d "/Applications/Cursor.app" ] || command -v cursor >/dev/null 2>&1 ;;
     claude-desktop) [ -d "$HOME/Library/Application Support/Claude" ] || [ -d "/Applications/Claude.app" ] ;;
     codex)          command -v codex >/dev/null 2>&1 || [ -d "$HOME/.codex" ] ;;
+    copilot)        command -v copilot >/dev/null 2>&1 || [ -d "$HOME/.copilot" ] ;;
     windsurf)       [ -d "$HOME/.codeium/windsurf" ] || [ -d "/Applications/Windsurf.app" ] || command -v windsurf >/dev/null 2>&1 ;;
     vscode)         command -v code >/dev/null 2>&1 || [ -d "/Applications/Visual Studio Code.app" ] || [ -d "$HOME/.vscode" ] ;;
     claude)         command -v claude >/dev/null 2>&1 || [ -d "$HOME/.claude" ] ;;
@@ -225,6 +228,8 @@ if [ "$SHOW_GENERIC" -eq 1 ]; then
   • VS Code:  key is "servers" and the entry needs  "type": "stdio"
   • Codex:    ~/.codex/config.toml — env vars go under a NESTED
               [mcp_servers.appknox.env] table (see README → Manual configuration)
+  • Copilot CLI: ~/.copilot/mcp-config.json — entry needs "type": "local" and
+              "tools": ["*"] (see README → Manual configuration)
 EOF
 fi
 

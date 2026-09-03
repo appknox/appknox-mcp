@@ -1,0 +1,76 @@
+name: Publish to Package Index
+
+# Fires ONLY when a GitHub Release is published — never on a bare push or tag,
+# and never on a schedule. "Creating a release" is the sole trigger, whether
+# the release comes from release.yml or `gh release create` directly.
+#
+# Routes on the release's prerelease flag:
+#   - prerelease (release.yml's default) -> TestPyPI. A safe, repeatable dry
+#     run of this exact pipeline (build, OIDC auth, publish) before anything
+#     ever touches the real index.
+#   - a real release (prerelease: false) -> PyPI.
+#
+# Requires one-time setup on both index's side before this can succeed —
+# nothing here works until you do this by hand (PyPI Trusted Publishing has no
+# API for it):
+#   1. On test.pypi.org and pypi.org, under your account -> Publishing, add a
+#      "pending" trusted publisher for this project:
+#        - PyPI project name: appknox-mcp
+#        - Owner: appknox   Repository: appknox-mcp
+#        - Workflow filename: publish.yml
+#        - Environment name: testpypi (on test.pypi.org) / pypi (on pypi.org)
+#   2. In this repo's Settings -> Environments, create two environments named
+#      "testpypi" and "pypi" (the names must match what you registered above).
+#      Optionally add required reviewers to the "pypi" environment for a manual
+#      gate on real publishes.
+# No secrets to create or store — Trusted Publishing uses each job's OIDC
+# token (the `id-token: write` permission below), which is why the environment
+# name has to match exactly.
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write # PyPI/TestPyPI Trusted Publishing (OIDC) — no stored token
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.release.prerelease && 'testpypi' || 'pypi' }}
+    env:
+      # Dummy token so importing the server / running tests never blocks on auth.
+      # Not a credential — see the identical note in release.yml.
+      APPKNOX_ACCESS_TOKEN: "PLACEHOLDER:PLACEHOLDER"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Publish exactly what was tagged, not whatever HEAD happens to be.
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Run tests
+        run: uv run pytest -q
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      - name: Publish to TestPyPI (prerelease dry run)
+        if: github.event.release.prerelease
+        run: uv publish --index testpypi
+
+      - name: Publish to PyPI
+        if: ${{ !github.event.release.prerelease }}
+        run: uv publish
+
+      - name: Summary
+        run: |
+          if [ "${{ github.event.release.prerelease }}" = "true" ]; then
+            echo "### Published to TestPyPI :test_tube:" >> "$GITHUB_STEP_SUMMARY"
+            echo "Verify with: \`uv tool install --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ appknox-mcp\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Published to PyPI :rocket:" >> "$GITHUB_STEP_SUMMARY"
+            echo "Verify with: \`uv tool install appknox-mcp\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
