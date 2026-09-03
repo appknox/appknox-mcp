@@ -11,7 +11,7 @@
     .\scripts\install.ps1 cursor codex        # install into the named clients directly
 
 .NOTES
-    Supported: cursor | claude-desktop | codex | windsurf | vscode | claude
+    Supported: cursor | claude-desktop | codex | copilot | windsurf | vscode | claude
 
     The access token is read from $env:APPKNOX_ACCESS_TOKEN, or prompted (hidden
     input, never placed on the command line). Existing client configs are merged,
@@ -29,7 +29,7 @@ $ErrorActionPreference = "Stop"
 $RepoDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $DefaultBaseUrl = "https://sherlock-mcp.staging.appknox.io"
 # Detection order = display order.
-$AllClients = @("cursor", "claude-desktop", "codex", "windsurf", "vscode", "claude")
+$AllClients = @("cursor", "claude-desktop", "codex", "copilot", "windsurf", "vscode", "claude")
 
 function Write-Info($msg) { Write-Host "  $msg" }
 function Write-Step($msg) { Write-Host "`n▸ $msg" -ForegroundColor White }
@@ -41,6 +41,7 @@ function Get-ClientLabel($client) {
         "cursor"         { "Cursor" }
         "claude-desktop" { "Claude Desktop" }
         "codex"          { "Codex CLI" }
+        "copilot"        { "GitHub Copilot CLI" }
         "windsurf"       { "Windsurf" }
         "vscode"         { "VS Code (project: this repo)" }
         "claude"         { "Claude Code (project: this repo)" }
@@ -53,6 +54,7 @@ function Get-ClientHint($client) {
         "cursor"         { "Restart Cursor; enable 'appknox' under Settings -> MCP if it's off." }
         "claude-desktop" { "Fully quit and reopen Claude Desktop so it respawns MCP servers." }
         "codex"          { "Restart the Codex session; run /mcp to confirm 'appknox'." }
+        "copilot"        { "Restart the Copilot CLI session; run /mcp to confirm 'appknox'." }
         "windsurf"       { "Restart Windsurf; enable the server in the MCP panel if needed." }
         "vscode"         { "Reload VS Code; start the server from .vscode/mcp.json." }
         "claude"         { "Restart Claude Code in this repo; run /appknox:triage or /appknox:fix." }
@@ -65,6 +67,7 @@ function Test-ClientPresent($client) {
         "cursor"         { (Test-Path "$env:USERPROFILE\.cursor") -or (Get-Command cursor -ErrorAction SilentlyContinue) }
         "claude-desktop" { Test-Path "$env:APPDATA\Claude" }
         "codex"          { (Get-Command codex -ErrorAction SilentlyContinue) -or (Test-Path "$env:USERPROFILE\.codex") }
+        "copilot"        { (Get-Command copilot -ErrorAction SilentlyContinue) -or (Test-Path "$env:USERPROFILE\.copilot") }
         "windsurf"       { (Test-Path "$env:USERPROFILE\.codeium\windsurf") -or (Get-Command windsurf -ErrorAction SilentlyContinue) }
         "vscode"         { (Get-Command code -ErrorAction SilentlyContinue) -or (Test-Path "$env:USERPROFILE\.vscode") }
         "claude"         { (Get-Command claude -ErrorAction SilentlyContinue) -or (Test-Path "$env:USERPROFILE\.claude") }
@@ -138,7 +141,10 @@ if ($Selected.Count -eq 0 -and -not $ShowGeneric) {
 }
 
 # ---- 4. credentials (only if we're writing at least one config) -------------
-$BaseUrl = if ($env:APPKNOX_BASE_URL) { $env:APPKNOX_BASE_URL } else { $DefaultBaseUrl }
+# No default base URL: white-labeled Appknox deployments use a different host
+# than the standard one, so guessing wrong here would silently point a
+# customer's agent at the wrong instance. Always ask.
+$BaseUrl = $env:APPKNOX_BASE_URL
 if ($Selected.Count -gt 0) {
     Write-Step "Credentials"
     if (-not $env:APPKNOX_ACCESS_TOKEN) {
@@ -150,10 +156,13 @@ if ($Selected.Count -gt 0) {
     }
     if (-not $env:APPKNOX_ACCESS_TOKEN) { Die "No access token provided." }
 
-    if (-not $env:APPKNOX_BASE_URL) {
-        $reply = Read-Host "  base URL [$DefaultBaseUrl]"
-        $BaseUrl = if ($reply) { $reply } else { $DefaultBaseUrl }
+    if (-not $BaseUrl) {
+        Write-Info "The API host for your Appknox instance - check your dashboard if unsure."
+        Write-Info "(e.g. $DefaultBaseUrl for Appknox's own KnoxIQ beta - white-labeled"
+        Write-Info "deployments use a different host, so don't assume this one.)"
+        $BaseUrl = Read-Host "  base URL"
     }
+    if (-not $BaseUrl) { Die "No base URL provided." }
     Write-Info "OK Using base URL: $BaseUrl"
 }
 
@@ -210,13 +219,15 @@ if ($ShowGeneric) {
       "args": ["run", "--directory", "$RepoDir", "appknox-mcp"],
       "env": {
         "APPKNOX_ACCESS_TOKEN": "<Access Key ID>:<Secret Access Key>",
-        "APPKNOX_BASE_URL": "$BaseUrl"
+        "APPKNOX_BASE_URL": "<your Appknox base URL>"
       }
     }
 
   - VS Code:  key is "servers" and the entry needs  "type": "stdio"
   - Codex:    ~/.codex/config.toml - env vars go under a NESTED
               [mcp_servers.appknox.env] table (see README -> Manual configuration)
+  - Copilot CLI: ~/.copilot/mcp-config.json - entry needs "type": "local" and
+              "tools": ["*"] (see README -> Manual configuration)
 "@
 }
 

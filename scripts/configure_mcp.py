@@ -48,6 +48,12 @@ def _json_entry(repo_dir: str, token: str, base_url: str) -> dict:
     return _entry("uv", _launch_args(repo_dir), token, base_url)
 
 
+def _copilot_home(home: Path) -> Path:
+    """Return the GitHub Copilot CLI config dir, honoring $COPILOT_HOME."""
+    override = os.environ.get("COPILOT_HOME")
+    return Path(override) if override else home / ".copilot"
+
+
 def _tool_entry(token: str, base_url: str) -> dict:
     """Installed-tool entry: launches the bare ``appknox-mcp`` command on PATH.
 
@@ -148,11 +154,12 @@ def _remove_codex_toml(path: Path) -> None:
 
 
 def _target(client: str, home: Path, cwd: Path) -> tuple[str, Path]:
-    """Map a client name to (kind, config path). kind is 'json'|'vscode'|'codex'."""
+    """Map a client name to (kind, config path). kind is 'json'|'vscode'|'codex'|'copilot'."""
     home_json = {
         "cursor": ("json", home / ".cursor" / "mcp.json"),
         "windsurf": ("json", home / ".codeium" / "windsurf" / "mcp_config.json"),
         "claude-desktop": ("json", _claude_desktop_path(home)),
+        "copilot": ("copilot", _copilot_home(home) / "mcp-config.json"),
     }
     project = {
         "claude": ("json", cwd / ".mcp.json"),
@@ -167,7 +174,7 @@ def _target(client: str, home: Path, cwd: Path) -> tuple[str, Path]:
 
 def _remove(kind: str, path: Path) -> None:
     """Remove the appknox server entry for a config of the given kind."""
-    if kind in ("json", "vscode"):
+    if kind in ("json", "vscode", "copilot"):
         _remove_json(path, "servers" if kind == "vscode" else "mcpServers")
     elif kind == "codex":
         _remove_codex_toml(path)
@@ -183,6 +190,11 @@ def _write(kind: str, path: Path, entry: dict) -> None:
         _write_json(path, "servers", entry, extra={"type": "stdio"})
     elif kind == "codex":
         _write_codex_toml(path, entry)
+    elif kind == "copilot":
+        # Copilot CLI requires an explicit "type" (stdio == "local") and a
+        # "tools" allowlist — without "tools": ["*"] it exposes none of the
+        # server's tools even though the server itself starts fine.
+        _write_json(path, "mcpServers", entry, extra={"type": "local", "tools": ["*"]})
     else:  # pragma: no cover - guarded by _target
         raise SystemExit(f"✗ Unhandled config kind '{kind}'")
 
