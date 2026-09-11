@@ -12,7 +12,7 @@ def _analysis(
     analysis_id: int,
     computed_risk: int,
     exploitability_score: float | None = None,
-    exploitability_likelihood: str | None = None,
+    exploitability_likelihood: int | None = None,
 ) -> dict[str, Any]:
     return {
         "id": analysis_id,
@@ -121,9 +121,10 @@ async def test_exploitability_comes_from_analyses_call_only(fake_client) -> None
     client = fake_client(
         analyses={
             1: [
-                _analysis(
-                    1, 4, exploitability_score=8.5, exploitability_likelihood="High"
-                ),
+                # 4 == ExploitabilityEnum.HIGH (the API's raw int code — see
+                # models.py; this is what broke list_analyses for real before
+                # the fix, since it used to be typed as a string).
+                _analysis(1, 4, exploitability_score=8.5, exploitability_likelihood=4),
                 _analysis(2, 1),
             ]
         },
@@ -133,6 +134,9 @@ async def test_exploitability_comes_from_analyses_call_only(fake_client) -> None
 
     assert len(rows) == 1
     assert rows[0]["exploitability_score"] == 8.5
+    # The raw int code (4) must come back as its display label, not the
+    # number — matching computed_risk/computed_risk_display's existing shape.
+    assert rows[0]["exploitability_likelihood"] == "High"
     assert not any(c[0] == "list_knoxiq_findings" for c in client.calls)
 
 

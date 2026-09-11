@@ -33,6 +33,22 @@ def _print_install_guide() -> None:
     print(text)
 
 
+def _configure_client(client: str, base_url: str) -> None:
+    """Write/merge this server into ``client``'s MCP config — the no-clone path.
+
+    Always ``tool`` mode (bare ``appknox-mcp`` command): anyone reaching this
+    CLI flag already has the package installed, so there's no repo path to
+    reference and no ``--repo``/``--tool`` distinction to expose here.
+
+    Imports ``configure`` locally: that module (and its ``subprocess``/``json``
+    imports) is only needed for this rare path, not the server's normal
+    startup — every other launch of ``appknox-mcp`` shouldn't pay for it.
+    """
+    from appknox_mcp import configure
+
+    configure.configure_client(client, configure.require_token(), base_url)
+
+
 def main() -> None:
     """Run the stdio MCP server.
 
@@ -46,9 +62,35 @@ def main() -> None:
         action="store_true",
         help="Print the setup guide (credentials, client config) and exit.",
     )
+    parser.add_argument(
+        "--configure",
+        metavar="CLIENT",
+        help=(
+            "Write/merge this server into CLIENT's MCP config (cursor, "
+            "claude-desktop, windsurf, copilot, codex, claude, vscode). Reads "
+            "the token from APPKNOX_ACCESS_TOKEN; needs --base-url."
+        ),
+    )
+    parser.add_argument(
+        "--remove-client",
+        metavar="CLIENT",
+        help="Remove this server's entry from CLIENT's MCP config.",
+    )
+    parser.add_argument("--base-url", help="API base URL — required with --configure.")
     args = parser.parse_args()
+
     if args.install_guide:
         _print_install_guide()
+        return
+    if args.configure:
+        if not args.base_url:
+            raise SystemExit("✗ --base-url is required with --configure.")
+        _configure_client(args.configure, args.base_url)
+        return
+    if args.remove_client:
+        from appknox_mcp import configure
+
+        configure.remove_client(args.remove_client)
         return
 
     if not access_token:

@@ -15,8 +15,9 @@ mapping, progress-line formatting, and parallel sub-agent dispatch.
 Arguments:
 - `$1` — **selection** (required), resolved per the workflow's SELECT step: a
   single **analysis_id**, `all`, a **severity** (or comma list, e.g.
-  `critical,high`), or an **exploitability range** (`highly exploitable`,
-  `critical exploitability`, ...).
+  `critical,high`), or an **exploitability level** (`highly exploitable`,
+  `high exploitability`, `medium exploitability`, ... — a shorter scale than
+  severity's, topping out at High, not Critical).
 - `$2` — **file_id** (optional): feeds the workflow's RESOLVE step. Omitted ->
   resolve from the repo (see the workflow's IDENTIFIER DETECTION).
 

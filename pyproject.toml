@@ -7,7 +7,14 @@ requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "Appknox" }]
 dependencies = [
-    "fastmcp>=2.0.0",
+    # Upper-bounded deliberately: fastmcp 4.x broke real MCP clients calling
+    # our tools (confirmed live — a client got "Invalid request parameters"
+    # on every call after a fresh `uv tool install` silently jumped 3.4.6,
+    # the version this project is actually tested against, to 4.0.3). `uv
+    # tool install` does a brand-new resolution every time — it does NOT
+    # consult uv.lock the way `uv sync` does — so an unbounded floor here
+    # means any future reinstall can silently pull an untested major version.
+    "fastmcp>=2.0.0,<4.0.0",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
 ]

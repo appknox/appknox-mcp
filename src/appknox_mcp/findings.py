@@ -35,8 +35,21 @@ async def previous_file_id(file_id: int) -> int | None:
     return max(earlier) if earlier else None
 
 
+# The API sends exploitability_likelihood as a raw IntegerChoices code with no
+# companion display field (unlike computed_risk/computed_risk_display) — this
+# is that enum, kept in sync with mycroft's ExploitabilityEnum. Note the top
+# tier here is "High", not "Critical" — a different, shorter scale than
+# computed_risk's (which does have a Critical tier); don't conflate the two.
+_EXPLOITABILITY_LIKELIHOOD_DISPLAY = {0: "Unknown", 1: "Passed", 2: "Low", 3: "Medium", 4: "High"}
+
+
 def _to_row(analysis: Analysis, include_exploitability: bool) -> dict[str, Any]:
     """Build a flat, display-ready row for one analysis."""
+    likelihood = (
+        _EXPLOITABILITY_LIKELIHOOD_DISPLAY.get(analysis.exploitability_likelihood)
+        if analysis.exploitability_likelihood is not None
+        else None
+    )
     return {
         "id": analysis.id,
         "vulnerability_id": analysis.vulnerability_id,
@@ -49,9 +62,7 @@ def _to_row(analysis: Analysis, include_exploitability: bool) -> dict[str, Any]:
         "exploitability_score": (
             analysis.exploitability_score if include_exploitability else None
         ),
-        "exploitability_likelihood": (
-            analysis.exploitability_likelihood if include_exploitability else None
-        ),
+        "exploitability_likelihood": likelihood if include_exploitability else None,
     }
 
 

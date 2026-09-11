@@ -71,7 +71,12 @@ class Analysis(_Model):
     vulnerability_scan_types: list[Any] | None = None
     cwe: list[str] | None = None
     exploitability_score: float | None = None
-    exploitability_likelihood: str | None = None
+    # Raw IntegerChoices code from the API (0 Unknown, 1 Passed, 2 Low,
+    # 3 Medium, 4 High) — unlike computed_risk, there is no companion
+    # `exploitability_likelihood_display` field; findings.py derives the
+    # label itself. This was `str` until it was found to reject every real
+    # response (the API never actually sends a string here).
+    exploitability_likelihood: int | None = None
 
 
 class KnoxIQFinding(_Model):

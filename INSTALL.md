@@ -34,16 +34,23 @@ Then ensure `~/.local/bin` is on PATH (the installer usually handles this).
 stopping at the first that works**; all produce a location-independent
 `appknox-mcp` command on PATH (usually `~/.local/bin/appknox-mcp`).
 
+> **Always include `--reinstall`** on every `uv tool install` below, even the
+> very first attempt. Without it, `uv` silently does **nothing** if any
+> version of `appknox-mcp` is already installed — including a stale one that
+> predates a flag like `--install-guide` — so re-running "install" can look
+> like it worked while actually leaving old, broken code in place. This is a
+> real failure mode that has happened, not a hypothetical edge case.
+
 **a) From PyPI (preferred — try this first).**
 ```bash
-uv tool install appknox-mcp
+uv tool install --reinstall appknox-mcp
 ```
 Not live yet — while `appknox-mcp` is only on TestPyPI, install from there
 instead (needs `--extra-index-url` since deps like `fastmcp` aren't on
 TestPyPI, and `--index-strategy unsafe-best-match` to let `uv` resolve across
 both indexes):
 ```bash
-uv tool install --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --index-strategy unsafe-best-match appknox-mcp
+uv tool install --reinstall --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --index-strategy unsafe-best-match appknox-mcp
 ```
 Once it's on real PyPI, switch to the plain command above and skip straight to
 verifying — only fall through to (b) if both of these fail.
@@ -54,28 +61,34 @@ uses the user's existing `gh`/GitHub auth), then install the local file:
 
 ```bash
 gh release download --repo appknox/appknox-mcp --pattern '*.whl' --dir /tmp/appknox-mcp
-uv tool install /tmp/appknox-mcp/*.whl
+uv tool install --reinstall /tmp/appknox-mcp/*.whl
 ```
 Add `<tag>` (e.g. `v0.1.0`) as the first arg to `gh release download` to pin a
 version; omit it for the latest. **When the repo is public**, skip `gh` entirely
 and install straight from the asset URL:
-`uv tool install "https://github.com/appknox/appknox-mcp/releases/latest/download/appknox_mcp-<version>-py3-none-any.whl"`.
+`uv tool install --reinstall "https://github.com/appknox/appknox-mcp/releases/latest/download/appknox_mcp-<version>-py3-none-any.whl"`.
 
 **c) From git (no release needed).**
 ```bash
-uv tool install "git+ssh://git@github.com/appknox/appknox-mcp@develop"   # private: uses the user's SSH key
-# public: uv tool install "git+https://github.com/appknox/appknox-mcp@develop"
+uv tool install --reinstall "git+ssh://git@github.com/appknox/appknox-mcp@develop"   # private: uses the user's SSH key
+# public: uv tool install --reinstall "git+https://github.com/appknox/appknox-mcp@develop"
 ```
 
 **d) From a local checkout** (if the user already cloned it):
-`uv tool install /path/to/appknox-mcp`.
+`uv tool install --reinstall /path/to/appknox-mcp`.
 
-Then verify — if this prints a path, the server is installed and no repo folder is
-needed afterward (nothing to keep or that can move):
+Then verify — `command -v appknox-mcp` only proves *a* binary is on PATH, not
+that it's actually the one you just installed (a stale prior install would
+also pass that check silently, as `--reinstall` above exists specifically to
+prevent). Confirm the real thing instead:
 
 ```bash
-command -v appknox-mcp
+appknox-mcp --install-guide | head -1
 ```
+
+If that doesn't print `# Installing the Appknox MCP server`, the install
+didn't actually take — re-run step 1's command with `--reinstall` (if you
+skipped it) rather than assuming this step is broken.
 
 To update later: `uv tool upgrade appknox-mcp` (works regardless of which
 source it was originally installed from) or re-run the `gh release download` +
@@ -162,6 +175,18 @@ The path honors `$COPILOT_HOME` if set (defaults to `~/.copilot`). Verify with
 > (VS Code's `.vscode/mcp.json` is shared by both plain VS Code MCP support and
 > Copilot Chat).
 
+> **Important — Copilot CLI ignores this server's workflow guidance by
+> default.** Every MCP server can send high-level instructions alongside its
+> tools (ours describes the resolve → triage → fix → verify flow, how to
+> select findings, etc.) — Copilot CLI deliberately does **not** feed these
+> into the model unless you start it with `copilot --allow-all-mcp-server-instructions`
+> (v1.0.66+). Without that flag, Copilot only sees each tool's own
+> name/parameters/docstring, not the overall workflow — it can still call the
+> tools correctly, but won't follow the intended multi-step flow or
+> presentation guidance (e.g. showing exploitability) unless asked explicitly
+> each time. Recommend this flag to anyone using Copilot CLI who wants the
+> guided experience the other clients get by default.
+
 ### VS Code — `.vscode/mcp.json`
 
 Key is `servers` and the entry needs `"type": "stdio"`:
@@ -178,6 +203,18 @@ Key is `servers` and the entry needs `"type": "stdio"`:
 }
 ```
 
+This is project-scoped (only active in this one repo), unlike every other
+client here — `appknox-mcp --configure vscode` writes the same project-scoped
+file, we don't automate the alternative below. VS Code does have a genuine
+**user-scope** option (works in every workspace): Command Palette → **MCP:
+Open User Configuration**, or `code --add-mcp '{"name":"appknox",...}'` and
+choose **Global** over **Workspace**. VS Code's own docs recommend *against* a
+literal secret even there — use an `${input:...}` variable (`password: true`)
+instead, which prompts once and caches the value in VS Code's own secret
+storage from then on. Set that up by hand if you want VS Code to behave like
+the other clients here; see [VS Code's MCP docs](https://code.visualstudio.com/docs/copilot/customization/mcp-servers)
+for the exact `inputs` array syntax.
+
 ### Codex — `~/.codex/config.toml`
 
 The env vars **must** go under a nested `[mcp_servers.appknox.env]` table, or
@@ -193,15 +230,19 @@ APPKNOX_ACCESS_TOKEN = "<Access Key ID>:<Secret Access Key>"
 APPKNOX_BASE_URL = "<your Appknox base URL>"
 ```
 
-> If the user cloned this repo, you can instead let the bundled writer do the
-> merge (handles the Codex nesting for you):
-> `python scripts/configure_mcp.py --client <name> --tool --base-url <url>`
-> with `APPKNOX_ACCESS_TOKEN` set in the environment.
+> You can skip writing any of the JSON/TOML above by hand and instead let the
+> already-installed `appknox-mcp` command do the merge for you (handles the
+> Codex nesting, Copilot's `type`/`tools` fields, etc. correctly) — works with
+> **no repo clone needed**, since the writer ships inside the package itself:
+> `APPKNOX_ACCESS_TOKEN=<id>:<secret> appknox-mcp --configure <name> --base-url <url>`.
+> To remove an entry later: `appknox-mcp --remove-client <name>`.
 
 ### Keep project-scoped tokens out of git
 
-For `claude` (`.mcp.json`) and `vscode` (`.vscode/mcp.json`), which live in the
-app repo and now contain the token, add the file to that repo's `.gitignore`.
+`vscode` (`.vscode/mcp.json`) lives in the app repo and now contains the
+token — add it to that repo's `.gitignore`. `claude` no longer needs this: it
+registers at user scope (`~/.claude.json`, outside any repo), not a
+project-scoped file.
 
 ### Claude Code only: the plugin (slash commands + fixer agent)
 
@@ -254,8 +295,11 @@ uv tool upgrade appknox-mcp          # pull the latest server
 uv tool uninstall appknox-mcp        # remove the server
 ```
 
-After uninstalling, also delete the `appknox` entry from the client config(s)
-(or run `scripts/uninstall.sh <client>` from a clone — `scripts/uninstall.ps1
-<client>` on Windows; for `claude` this also removes the plugin). To remove just
-the plugin by hand: `claude plugin uninstall appknox@appknox` then
+Before (or instead of) removing the server itself, remove its entry from each
+client's config: `appknox-mcp --remove-client <client>` — this needs no repo
+clone, since it ships inside the package (see the note in step 3). If the repo
+happens to be cloned, `scripts/uninstall.sh <client>`/`scripts/uninstall.ps1
+<client>` do the same thing and additionally remove the Claude Code plugin
+registration for `claude`. To remove just the plugin by hand:
+`claude plugin uninstall appknox@appknox` then
 `claude plugin marketplace remove appknox`.
