@@ -180,12 +180,15 @@ ensure_gitignored() {
   fi
 }
 
-# Claude Code also gets this as a plugin (marketplace-installed at user scope),
-# not just an MCP entry: the plugin bundles the server's .mcp.json AND the
-# slash commands + fixer agent, so it works from any repo afterward — a plain
-# .mcp.json entry alone (below) only works in the one repo you write it to.
-# Commands are namespaced /appknox:<name> — the plugin system always prefixes
-# <plugin>:<command>, no opt-out, so that's the canonical naming everywhere.
+# Claude Code also gets this as a plugin (marketplace-installed at user scope):
+# the plugin adds the /appknox:<name> slash commands + fixer agent — it does
+# NOT provide the working MCP connection with real credentials (its own
+# bundled .mcp.json reads $APPKNOX_ACCESS_TOKEN/$APPKNOX_BASE_URL from the
+# environment, since that file is shared plugin code, not a personal config).
+# The actual credentialed connection is the `claude mcp add --scope user` call
+# above (configure_mcp.py's "claude" client) — this just adds the commands on
+# top of it. Commands are namespaced /appknox:<name> — the plugin system
+# always prefixes <plugin>:<command>, no opt-out.
 install_claude_plugin() {
   if ! command -v claude >/dev/null 2>&1; then
     warn "claude CLI not found — skipping plugin install (commands/agent won't be available)."
@@ -194,9 +197,9 @@ install_claude_plugin() {
   claude plugin marketplace add "$REPO_DIR" --scope user >/dev/null
   claude plugin install appknox@appknox -y >/dev/null
   info "✓ Installed the appknox plugin (slash commands + fixer agent, user scope)"
-  warn "The plugin's MCP entry reads \$APPKNOX_ACCESS_TOKEN/\$APPKNOX_BASE_URL from"
-  warn "your shell at launch — export them in your shell profile to use it outside"
-  warn "this repo, or rely on the .mcp.json below (token baked in, this repo only)."
+  warn "The plugin's OWN MCP entry (separate from the one just registered above)"
+  warn "reads \$APPKNOX_ACCESS_TOKEN/\$APPKNOX_BASE_URL from your shell at launch —"
+  warn "export them in your shell profile if /appknox:* commands need it too."
 }
 
 for CLIENT in "${SELECTED[@]}"; do
@@ -206,7 +209,7 @@ for CLIENT in "${SELECTED[@]}"; do
   uv run --no-project --directory "$REPO_DIR" python "$REPO_DIR/scripts/configure_mcp.py" \
     --client "$CLIENT" --repo "$REPO_DIR" --base-url "$BASE_URL" --cwd "$PWD"
   case "$CLIENT" in
-    claude) ensure_gitignored ".mcp.json"; install_claude_plugin ;;
+    claude) install_claude_plugin ;;
     vscode) ensure_gitignored ".vscode/mcp.json" ;;
   esac
   info "→ $(client_hint "$CLIENT")"

@@ -25,8 +25,10 @@ nothing else to keep in sync here:
 
 ```
 Install the appknox-mcp MCP server for me:
-1. `uv tool install --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --index-strategy unsafe-best-match appknox-mcp`
-   (once it's on real PyPI, just: `uv tool install appknox-mcp`)
+1. `uv tool install --reinstall --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --index-strategy unsafe-best-match appknox-mcp`
+   (once it's on real PyPI, just: `uv tool install --reinstall appknox-mcp`) —
+   **always include `--reinstall`**: without it, `uv` silently does nothing if
+   any version is already installed, even a stale one missing this exact flag.
 2. Run `appknox-mcp --install-guide` and follow it exactly.
 ```
 
@@ -85,9 +87,11 @@ it picked up `appknox`:
 <details>
 <summary><strong>Claude Code</strong></summary>
 
-Run `/mcp` in a session inside the repo — you should see `appknox` listed with
-~9 tools. If you also installed the plugin, try `/appknox:triage` to confirm
-the slash commands loaded.
+Run `/mcp` in any session — it's registered at user scope, so this works in
+any project, not just one repo — you should see `appknox` listed with ~9
+tools. If you also installed the plugin, try `/appknox:triage` to confirm the
+slash commands loaded (this needs the plugin's own credentials — see
+[INSTALL.md](INSTALL.md) for the env-var export it relies on).
 </details>
 
 <details>
@@ -112,6 +116,12 @@ server list.
 
 Restart your `copilot` session, then run `/mcp` inside it — or run
 `copilot mcp list` directly from your shell. Either should show `appknox`.
+
+**Also run with `--allow-all-mcp-server-instructions`** (v1.0.66+) if you want
+the guided workflow (resolve → triage → fix → verify, exploitability shown by
+default, etc.) — Copilot CLI doesn't feed any MCP server's instructions to the
+model without it, so without this flag it'll still call the tools correctly
+but skip the intended flow unless you spell each step out yourself.
 </details>
 
 <details>
@@ -213,6 +223,15 @@ Per-client config file paths and shapes: [INSTALL.md](INSTALL.md#3-write-the-mcp
 
 ## Uninstall
 
+**Installed via Option A (no clone)?** Use the bundled command — it needs
+nothing but the package you already have:
+```bash
+appknox-mcp --remove-client cursor        # same client names as install
+```
+Then, to remove the package itself: `uv tool uninstall appknox-mcp`.
+
+**Installed via Option B (cloned the repo)?** Use the installer scripts —
+functionally identical, just also cleans up the Claude Code plugin registration:
 ```bash
 ./scripts/uninstall.sh cursor        # same client names as install
 ```
@@ -220,5 +239,5 @@ Per-client config file paths and shapes: [INSTALL.md](INSTALL.md#3-write-the-mcp
 .\scripts\uninstall.ps1 cursor       # Windows
 ```
 
-Removes only the `appknox` entry from that client's config; nothing else is
-touched. Restart the client afterwards.
+Either way, only the `appknox` entry is removed from that client's config;
+nothing else is touched. Restart the client afterwards.

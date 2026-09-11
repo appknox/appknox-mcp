@@ -32,14 +32,36 @@ def _next_page_params(next_url: str) -> dict[str, str]:
     return {key: values[0] for key, values in parse_qs(query).items()}
 
 
+def _ensure_https(url: str) -> str:
+    """Normalize a base URL to ``https://`` — every Appknox environment
+    redirects away from any other scheme at the infrastructure layer, so a
+    bare host or an explicit ``http://`` can never actually work. Fixing it
+    here, silently, avoids a whole class of confusing 301/308 failures
+    instead of surfacing an error for a human or LLM to puzzle over and
+    manually correct.
+    """
+    if url.startswith("https://"):
+        return url
+    _, sep, rest = url.partition("://")
+    return f"https://{rest if sep else url}"
+
+
 def _error_detail(response: httpx.Response) -> str:
-    """Pull a short, human-readable reason out of an error response body.
+    """Pull a short, human-readable reason out of an error response.
 
     Appknox's API returns different shapes for different failures — e.g.
     ``{"detail": "Invalid token"}`` for auth, ``{"error": "Not Found (404)"}``
     for a missing resource — so check the common keys before falling back to
     the raw (truncated) body.
+
+    A redirect (3xx) carries none of that: the body is typically empty, so the
+    only thing that actually explains it is the ``Location`` header — without
+    it, a redirect error is just a bare status code with no way to tell
+    whether it's a scheme mismatch, a trailing-slash issue, or a moved host.
     """
+    if response.is_redirect:
+        location = response.headers.get("location")
+        return f"redirected to {location}" if location else "redirected (no Location header)"
     try:
         body = response.json()
     except ValueError:
@@ -62,7 +84,7 @@ class AppknoxClient:
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self._http = httpx.AsyncClient(
-            base_url=base_url,
+            base_url=_ensure_https(base_url),
             headers={"Authorization": f"Bearer {access_token}"},
             timeout=timeout,
             transport=transport,

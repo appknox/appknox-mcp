@@ -50,8 +50,10 @@ results and errors than the tool it was supposed to replace.
    as the sort/grouping key — a table with severity but no exploitability
    column is an incomplete triage view, whatever surface you're rendering it
    on (a chat table, a slash-command's formatted output, anything else). Also
-   present a Critical/High/Medium/Low breakdown by exploitability_likelihood,
-   then the same by severity.
+   present a High/Medium/Low/Passed/Unknown breakdown by
+   exploitability_likelihood — a shorter, different scale than severity's
+   (its top tier is High, there is no Critical here) — then the same by
+   severity.
 
 4. SELECT. Never fix without an explicit choice from the user — suggest a
    default ("fix all highly exploitable") but wait for their reply, then resolve
@@ -60,8 +62,9 @@ results and errors than the tool it was supposed to replace.
    - "all" -> every listed finding.
    - a severity, or comma list ("critical", "critical,high") -> match on
      computed_risk_display, case-insensitive.
-   - "highly exploitable" -> exploitability_likelihood in {High, Critical}.
-   - "<level> exploitability" (e.g. "critical exploitability") -> that exact
+   - "highly exploitable" -> exploitability_likelihood == High (its top tier —
+     unlike severity, this scale has no Critical).
+   - "<level> exploitability" (e.g. "high exploitability") -> that exact
      exploitability_likelihood.
    If the reply is ambiguous or matches nothing, ask again rather than guessing.
 
