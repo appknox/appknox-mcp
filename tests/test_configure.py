@@ -12,7 +12,6 @@ import pytest
 
 from appknox_mcp import configure as configure_mcp
 
-
 REPO = "/opt/appknox-mcp"
 TOKEN = "KEYID:secret"
 BASE_URL = "https://sherlock-mcp.staging.appknox.io"
@@ -34,13 +33,17 @@ def test_tool_entry_is_location_independent() -> None:
 
 
 def test_build_entry_tool_mode_ignores_missing_repo() -> None:
-    entry = configure_mcp._build_entry(tool=True, repo=None, token=TOKEN, base_url=BASE_URL)
+    entry = configure_mcp._build_entry(
+        tool=True, repo=None, token=TOKEN, base_url=BASE_URL
+    )
     assert entry["command"] == "appknox-mcp"
 
 
 def test_build_entry_source_mode_requires_repo() -> None:
     with pytest.raises(SystemExit, match="--repo is required"):
-        configure_mcp._build_entry(tool=False, repo=None, token=TOKEN, base_url=BASE_URL)
+        configure_mcp._build_entry(
+            tool=False, repo=None, token=TOKEN, base_url=BASE_URL
+        )
 
 
 def test_configure_client_writes_tool_entry_with_no_repo_needed(
@@ -68,7 +71,9 @@ def test_remove_client_deletes_the_entry(
 def test_write_json_preserves_existing_servers(tmp_path: Path) -> None:
     path = tmp_path / "mcp.json"
     path.write_text(json.dumps({"mcpServers": {"other": {"command": "x"}}}))
-    configure_mcp._write_json(path, "mcpServers", configure_mcp._json_entry(REPO, TOKEN, BASE_URL))
+    configure_mcp._write_json(
+        path, "mcpServers", configure_mcp._json_entry(REPO, TOKEN, BASE_URL)
+    )
     data = json.loads(path.read_text())
     assert "other" in data["mcpServers"]  # untouched
     assert data["mcpServers"]["appknox"]["command"] == "uv"
@@ -76,9 +81,16 @@ def test_write_json_preserves_existing_servers(tmp_path: Path) -> None:
 
 def test_write_json_creates_missing_file(tmp_path: Path) -> None:
     path = tmp_path / "nested" / "mcp.json"
-    configure_mcp._write_json(path, "mcpServers", configure_mcp._json_entry(REPO, TOKEN, BASE_URL))
+    configure_mcp._write_json(
+        path, "mcpServers", configure_mcp._json_entry(REPO, TOKEN, BASE_URL)
+    )
     assert path.exists()
-    assert json.loads(path.read_text())["mcpServers"]["appknox"]["env"]["APPKNOX_ACCESS_TOKEN"] == TOKEN
+    assert (
+        json.loads(path.read_text())["mcpServers"]["appknox"]["env"][
+            "APPKNOX_ACCESS_TOKEN"
+        ]
+        == TOKEN
+    )
 
 
 def test_write_json_rejects_invalid_json(tmp_path: Path) -> None:
@@ -91,7 +103,10 @@ def test_write_json_rejects_invalid_json(tmp_path: Path) -> None:
 def test_vscode_entry_gets_type_stdio(tmp_path: Path) -> None:
     path = tmp_path / "mcp.json"
     configure_mcp._write_json(
-        path, "servers", configure_mcp._json_entry(REPO, TOKEN, BASE_URL), extra={"type": "stdio"}
+        path,
+        "servers",
+        configure_mcp._json_entry(REPO, TOKEN, BASE_URL),
+        extra={"type": "stdio"},
     )
     assert json.loads(path.read_text())["servers"]["appknox"]["type"] == "stdio"
 
@@ -149,9 +164,18 @@ def test_target_unknown_client_raises() -> None:
 
 def test_target_paths(tmp_path: Path) -> None:
     home, cwd = Path("/home/x"), Path("/repo")
-    assert configure_mcp._target("cursor", home, cwd) == ("json", home / ".cursor" / "mcp.json")
-    assert configure_mcp._target("codex", home, cwd) == ("codex", home / ".codex" / "config.toml")
-    assert configure_mcp._target("vscode", home, cwd) == ("vscode", cwd / ".vscode" / "mcp.json")
+    assert configure_mcp._target("cursor", home, cwd) == (
+        "json",
+        home / ".cursor" / "mcp.json",
+    )
+    assert configure_mcp._target("codex", home, cwd) == (
+        "codex",
+        home / ".codex" / "config.toml",
+    )
+    assert configure_mcp._target("vscode", home, cwd) == (
+        "vscode",
+        cwd / ".vscode" / "mcp.json",
+    )
 
 
 def test_target_does_not_handle_claude() -> None:
@@ -185,21 +209,41 @@ def test_claude_mcp_add_succeeds_on_first_try_without_remove(
 
     configure_mcp._claude_mcp_add(configure_mcp._tool_entry(TOKEN, BASE_URL))
 
-    assert calls == [[
-        "claude", "mcp", "add", "--scope", "user",
-        "-e", f"APPKNOX_ACCESS_TOKEN={TOKEN}",
-        "-e", f"APPKNOX_BASE_URL={BASE_URL}",
-        "--", "appknox", "appknox-mcp",
-    ]]
+    assert calls == [
+        [
+            "claude",
+            "mcp",
+            "add",
+            "--scope",
+            "user",
+            "-e",
+            f"APPKNOX_ACCESS_TOKEN={TOKEN}",
+            "-e",
+            f"APPKNOX_BASE_URL={BASE_URL}",
+            "--",
+            "appknox",
+            "appknox-mcp",
+        ]
+    ]
 
 
-def test_claude_mcp_add_includes_source_mode_args(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_claude_mcp_add_includes_source_mode_args(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls, fake_run = _record_run()
     monkeypatch.setattr(configure_mcp.subprocess, "run", fake_run)
 
     configure_mcp._claude_mcp_add(configure_mcp._json_entry(REPO, TOKEN, BASE_URL))
 
-    assert calls[0][-7:] == ["--", "appknox", "uv", "run", "--directory", REPO, "appknox-mcp"]
+    assert calls[0][-7:] == [
+        "--",
+        "appknox",
+        "uv",
+        "run",
+        "--directory",
+        REPO,
+        "appknox-mcp",
+    ]
 
 
 def test_claude_mcp_add_retries_via_remove_when_already_exists(
@@ -207,16 +251,28 @@ def test_claude_mcp_add_retries_via_remove_when_already_exists(
 ) -> None:
     """Only the update case pays for remove + retry, not the common fresh case."""
     add_args = [
-        "claude", "mcp", "add", "--scope", "user",
-        "-e", f"APPKNOX_ACCESS_TOKEN={TOKEN}",
-        "-e", f"APPKNOX_BASE_URL={BASE_URL}",
-        "--", "appknox", "appknox-mcp",
+        "claude",
+        "mcp",
+        "add",
+        "--scope",
+        "user",
+        "-e",
+        f"APPKNOX_ACCESS_TOKEN={TOKEN}",
+        "-e",
+        f"APPKNOX_BASE_URL={BASE_URL}",
+        "--",
+        "appknox",
+        "appknox-mcp",
     ]
-    calls, fake_run = _record_run(results=[
-        subprocess.CompletedProcess(add_args, 1, "", "MCP server appknox already exists"),
-        subprocess.CompletedProcess([], 0, "", ""),  # the remove
-        subprocess.CompletedProcess(add_args, 0, "", ""),  # the retried add
-    ])
+    calls, fake_run = _record_run(
+        results=[
+            subprocess.CompletedProcess(
+                add_args, 1, "", "MCP server appknox already exists"
+            ),
+            subprocess.CompletedProcess([], 0, "", ""),  # the remove
+            subprocess.CompletedProcess(add_args, 0, "", ""),  # the retried add
+        ]
+    )
     monkeypatch.setattr(configure_mcp.subprocess, "run", fake_run)
 
     configure_mcp._claude_mcp_add(configure_mcp._tool_entry(TOKEN, BASE_URL))
@@ -247,11 +303,15 @@ def test_claude_mcp_add_raises_immediately_on_non_conflict_failure(
 def test_claude_mcp_add_raises_final_error_if_retry_also_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls, fake_run = _record_run(results=[
-        subprocess.CompletedProcess([], 1, "", "MCP server appknox already exists"),
-        subprocess.CompletedProcess([], 0, "", ""),  # the remove
-        subprocess.CompletedProcess([], 1, "", "still broken"),  # retried add fails too
-    ])
+    _calls, fake_run = _record_run(
+        results=[
+            subprocess.CompletedProcess([], 1, "", "MCP server appknox already exists"),
+            subprocess.CompletedProcess([], 0, "", ""),  # the remove
+            subprocess.CompletedProcess(
+                [], 1, "", "still broken"
+            ),  # retried add fails too
+        ]
+    )
     monkeypatch.setattr(configure_mcp.subprocess, "run", fake_run)
 
     with pytest.raises(SystemExit, match="still broken"):
@@ -325,7 +385,11 @@ def test_target_claude_desktop_is_json_and_named_correctly() -> None:
 
 def test_remove_json_deletes_only_appknox(tmp_path: Path) -> None:
     path = tmp_path / "mcp.json"
-    path.write_text(json.dumps({"mcpServers": {"appknox": {"command": "uv"}, "other": {"command": "x"}}}))
+    path.write_text(
+        json.dumps(
+            {"mcpServers": {"appknox": {"command": "uv"}, "other": {"command": "x"}}}
+        )
+    )
     configure_mcp._remove_json(path, "mcpServers")
     data = json.loads(path.read_text())
     assert "appknox" not in data["mcpServers"]
@@ -339,7 +403,9 @@ def test_remove_json_missing_file_is_noop(tmp_path: Path) -> None:
 
 def test_remove_codex_toml_strips_block_keeps_rest(tmp_path: Path) -> None:
     path = tmp_path / "config.toml"
-    configure_mcp._write_codex_toml(path, configure_mcp._json_entry(REPO, TOKEN, BASE_URL))
+    configure_mcp._write_codex_toml(
+        path, configure_mcp._json_entry(REPO, TOKEN, BASE_URL)
+    )
     path.write_text('model = "gpt-5"\n\n' + path.read_text())
     configure_mcp._remove_codex_toml(path)
     text = path.read_text()

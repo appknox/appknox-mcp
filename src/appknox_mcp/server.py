@@ -5,16 +5,15 @@ import importlib.resources
 import sys
 from pathlib import Path
 
-from appknox_mcp.app import access_token, mcp
-
 # Tool modules register their @mcp.tool tools on import.
-from appknox_mcp import (  # noqa: E402, F401
+from appknox_mcp import (  # noqa: F401
     findings,
     resolve,
     status,
     upload,
     verify,
 )
+from appknox_mcp.app import access_token, mcp
 
 
 def _print_install_guide() -> None:
@@ -26,11 +25,73 @@ def _print_install_guide() -> None:
     it there — fall back to the repo's actual top-level copy in that case.
     """
     try:
-        text = importlib.resources.files("appknox_mcp").joinpath("INSTALL.md").read_text()
+        text = (
+            importlib.resources.files("appknox_mcp").joinpath("INSTALL.md").read_text()
+        )
     except FileNotFoundError:
         repo_root = Path(__file__).resolve().parent.parent.parent
         text = (repo_root / "INSTALL.md").read_text()
     print(text)
+
+
+def _install_claude_plugin() -> None:
+    """Register the Claude Code plugin (slash commands + fixer agent) with no
+    repo clone and no GitHub access at all.
+
+    ``claude plugin marketplace add owner/repo`` has Claude Code itself clone
+    the repo — that doesn't reliably work against a private repo (no
+    gh/keychain credential passthrough; a known Claude Code limitation) and
+    only ever looks at the repo's default branch. Sidestep both problems by
+    extracting the plugin files this wheel already bundles (see
+    pyproject.toml's force-include) to a stable local directory and pointing
+    ``claude plugin marketplace add`` at *that* — the local-path form, which
+    needs no cloning of anything.
+
+    The target directory is wiped and re-extracted every run, so re-running
+    this after ``uv tool upgrade`` picks up a newer bundled plugin.
+    """
+    import shutil
+    import subprocess
+
+    target = Path.home() / ".appknox-mcp" / "claude-plugin"
+    try:
+        bundled = importlib.resources.files("appknox_mcp").joinpath("claude_plugin")
+        with importlib.resources.as_file(bundled) as src:
+            if not src.is_dir():
+                raise FileNotFoundError
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(src, target)
+    except FileNotFoundError:
+        # Editable/source checkout: the force-include copy only exists in a
+        # built wheel (see _print_install_guide's identical fallback) — use
+        # the repo's actual top-level files directly instead of extracting.
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        target = repo_root
+
+    result = subprocess.run(
+        ["claude", "plugin", "marketplace", "add", str(target), "--scope", "user"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"✗ claude plugin marketplace add failed: "
+            f"{result.stderr.strip() or result.stdout.strip()}"
+        )
+    result = subprocess.run(
+        ["claude", "plugin", "install", "appknox@appknox", "-y"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"✗ claude plugin install failed: "
+            f"{result.stderr.strip() or result.stdout.strip()}"
+        )
+    print(f"✓ Registered the Claude Code plugin from {target}")
 
 
 def _configure_client(client: str, base_url: str) -> None:
@@ -76,11 +137,23 @@ def main() -> None:
         metavar="CLIENT",
         help="Remove this server's entry from CLIENT's MCP config.",
     )
+    parser.add_argument(
+        "--install-claude-plugin",
+        action="store_true",
+        help=(
+            "Register the Claude Code plugin (slash commands + fixer agent) "
+            "with no repo clone or GitHub access needed. Requires the `claude` "
+            "CLI on PATH."
+        ),
+    )
     parser.add_argument("--base-url", help="API base URL — required with --configure.")
     args = parser.parse_args()
 
     if args.install_guide:
         _print_install_guide()
+        return
+    if args.install_claude_plugin:
+        _install_claude_plugin()
         return
     if args.configure:
         if not args.base_url:

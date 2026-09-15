@@ -49,6 +49,7 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     outputs:
+      found: ${{ steps.find.outputs.found }}
       tag: ${{ steps.find.outputs.tag }}
       prerelease: ${{ steps.find.outputs.prerelease }}
     steps:
@@ -62,14 +63,20 @@ jobs:
           RELEASE_JSON=$(gh api "repos/${{ github.repository }}/releases" \
             | jq -r --arg sha "$SHA" '[.[] | select(.target_commitish == $sha)] | first // empty')
           if [ -z "$RELEASE_JSON" ]; then
-            echo "::error::No release found with target_commitish=$SHA (from run ${{ github.event.workflow_run.id }})"
-            exit 1
+            # release.yml skips creating a release when the merge didn't bump
+            # the version (see its "Skip if already released" step) — that's
+            # the common case for most merges, not a failure here.
+            echo "No release found for $SHA — release.yml likely skipped (no version bump). Nothing to publish."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
           echo "tag=$(echo "$RELEASE_JSON" | jq -r .tag_name)" >> "$GITHUB_OUTPUT"
           echo "prerelease=$(echo "$RELEASE_JSON" | jq -r .prerelease)" >> "$GITHUB_OUTPUT"
 
   publish:
     needs: resolve
+    if: needs.resolve.outputs.found == 'true'
     runs-on: ubuntu-latest
     # Has to be resolved here, not inside a step — environment protection
     # rules are evaluated before the job's steps run.

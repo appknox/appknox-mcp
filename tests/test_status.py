@@ -28,12 +28,20 @@ def _file(
         "name": "App",
         "package_name": "com.x",
         "version": "1.0",
+        "version_code": "1",
+        "platform": 0,
         "platform_display": "Android",
         "project_id": 1,
         "sast_status": sast,
         "dast_status": dast,
-        "static_scan_progress": 100 if sast == "Completed" else 40,
         "knoxiq_status": knoxiq_status,
+        "risk_count_critical": 0,
+        "risk_count_high": 0,
+        "risk_count_medium": 0,
+        "risk_count_low": 0,
+        "risk_count_passed": 0,
+        "risk_count_untested": 0,
+        "is_last_file": True,
     }
 
 

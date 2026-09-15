@@ -1,18 +1,31 @@
 name: Build & Release Wheel
 
-# Manual trigger for now. Run from the Actions tab (or `gh workflow run
-# release.yml`). It tests, builds the wheel + sdist, smoke-tests the BUILT wheel
-# (not the source tree), then creates a GitHub Release with the artifacts
-# attached — so you can `uv tool install <release-wheel-url>` and test the real
-# install path.
+# Runs automatically on every push to develop (i.e. every PR merge), and can
+# also be run by hand from the Actions tab (or `gh workflow run release.yml`)
+# to pin a specific tag/prerelease flag. It tests, builds the wheel + sdist,
+# smoke-tests the BUILT wheel (not the source tree), then creates a GitHub
+# Release with the artifacts attached — so you can
+# `uv tool install <release-wheel-url>` and test the real install path.
+#
+# Most merges won't have bumped pyproject.toml's version, so this skips
+# cleanly (not an error) when a release for the current version already
+# exists — see "Skip if already released" below. A manual dispatch treats
+# that same situation as a hard error instead, since running it by hand means
+# you expect it to actually produce something.
 #
 # Publishing to TestPyPI/PyPI is a SEPARATE workflow (publish.yml) that
 # triggers off THIS workflow's completion (not the `release` event directly
 # — GitHub won't cascade an event created by this job's own GITHUB_TOKEN into
-# another workflow) and only publishes if this run succeeded. See that file
-# for the one-time Trusted Publishing setup it needs, and note that a release
-# published by hand (not via this workflow) will NOT trigger it.
+# another workflow) and only publishes if this run actually created a release.
+# See that file for the one-time Trusted Publishing setup it needs, and note
+# that a release published by hand (not via this workflow) will NOT trigger it.
 on:
+  # Every PR merge into develop is a push to develop (direct pushes are
+  # blocked by branch protection) — this is "release on merge". Most merges
+  # won't have bumped the version, so the "Skip if already released" step
+  # below no-ops those quietly instead of erroring.
+  push:
+    branches: [develop]
   workflow_dispatch:
     inputs:
       tag:
@@ -43,21 +56,6 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Run tests
-        run: uv run pytest -q
-
-      - name: Build wheel + sdist
-        run: uv build
-
-      - name: Smoke-test the built wheel (import + tool count) in a clean venv
-        run: |
-          uv venv /tmp/verify
-          uv pip install --python /tmp/verify/bin/python dist/*.whl
-          # Run from /tmp so a source-relative file (e.g. the repo's docs/) can't
-          # mask a packaging bug — this is exactly what caught the spec-load crash.
-          cd /tmp
-          /tmp/verify/bin/python -c "import asyncio, appknox_mcp.server as s; n=len(asyncio.run(s.mcp.list_tools())); print(f'built wheel OK — {n} tools'); assert n >= 7, n"
-
       - name: Resolve release tag
         id: meta
         run: |
@@ -68,19 +66,51 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Release tag: $TAG"
 
+      - name: Skip if already released
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "::error::Release $TAG already exists. Bump the version or pass a new tag."
+            exit 1
+          fi
+          echo "Release $TAG already exists — no version bump in this merge, nothing to release."
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        if: steps.check.outputs.skip != 'true'
+        run: uv run pytest -q
+
+      - name: Build wheel + sdist
+        if: steps.check.outputs.skip != 'true'
+        run: uv build
+
+      - name: Smoke-test the built wheel (import + tool count) in a clean venv
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          uv venv /tmp/verify
+          uv pip install --python /tmp/verify/bin/python dist/*.whl
+          # Run from /tmp so a source-relative file (e.g. the repo's docs/) can't
+          # mask a packaging bug — this is exactly what caught the spec-load crash.
+          cd /tmp
+          /tmp/verify/bin/python -c "import asyncio, appknox_mcp.server as s; n=len(asyncio.run(s.mcp.list_tools())); print(f'built wheel OK — {n} tools'); assert n >= 7, n"
+
       - name: Create GitHub Release with artifacts
+        if: steps.check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.meta.outputs.tag }}
           PRERELEASE: ${{ inputs.prerelease }}
         run: |
+          if [ -z "$PRERELEASE" ]; then PRERELEASE="true"; fi
           FLAGS=(--title "$TAG" --generate-notes --target "$GITHUB_SHA")
           if [ "$PRERELEASE" = "true" ]; then FLAGS+=(--prerelease); fi
-          # Fail clearly if the tag already has a release (manual reruns).
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "::error::Release $TAG already exists. Bump the version or pass a new tag."
-            exit 1
-          fi
           gh release create "$TAG" dist/*.whl dist/*.tar.gz "${FLAGS[@]}"
           echo "Wheel install URL:"
           gh release view "$TAG" --json assets --jq '.assets[] | select(.name|endswith(".whl")) | .url'

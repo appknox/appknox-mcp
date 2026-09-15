@@ -3,11 +3,46 @@
 import httpx
 import pytest
 
-from appknox_mcp.client import AppknoxClient, AppknoxAPIError, _ensure_https
+from appknox_mcp.client import AppknoxAPIError, AppknoxClient, _ensure_https
 
 
 def _client(handler) -> AppknoxClient:
     return AppknoxClient("https://test", "tok", transport=httpx.MockTransport(handler))
+
+
+def _file_json(file_id: int) -> dict:
+    """A minimal but complete File payload — every field the model requires."""
+    return {
+        "id": file_id,
+        "name": "App",
+        "package_name": "com.x",
+        "version": "1.0",
+        "version_code": "1",
+        "platform": 0,
+        "platform_display": "Android",
+        "project_id": 1,
+        "sast_status": "Completed",
+        "dast_status": "Not Started",
+        "risk_count_critical": 0,
+        "risk_count_high": 0,
+        "risk_count_medium": 0,
+        "risk_count_low": 0,
+        "risk_count_passed": 0,
+        "risk_count_untested": 0,
+        "is_last_file": True,
+    }
+
+
+def _project_json(project_id: int) -> dict:
+    """A minimal but complete Project payload — every field the model requires."""
+    return {
+        "id": project_id,
+        "package_name": "com.x",
+        "platform": 0,
+        "platform_display": "Android",
+        "last_file_id": None,
+        "file_count": 0,
+    }
 
 
 def test_ensure_https_leaves_https_url_unchanged() -> None:
@@ -45,7 +80,8 @@ async def test_client_actually_sends_requests_to_the_normalized_url() -> None:
         "sherlock-mcp.staging.appknox.io",
         "tok",
         transport=httpx.MockTransport(
-            lambda request: seen_urls.append(str(request.url)) or httpx.Response(200, json={"id": 5})
+            lambda request: seen_urls.append(str(request.url))
+            or httpx.Response(200, json=_file_json(5))
         ),
     )
     await client.get_file(5)
@@ -53,7 +89,7 @@ async def test_client_actually_sends_requests_to_the_normalized_url() -> None:
 
 
 async def test_get_file_returns_json() -> None:
-    client = _client(lambda request: httpx.Response(200, json={"id": 5}))
+    client = _client(lambda request: httpx.Response(200, json=_file_json(5)))
     file = await client.get_file(5)
     assert file.id == 5
 
@@ -65,13 +101,17 @@ async def test_error_raises_appknox_api_error() -> None:
 
 
 async def test_error_message_surfaces_status_and_detail_key() -> None:
-    client = _client(lambda request: httpx.Response(401, json={"detail": "Invalid token"}))
+    client = _client(
+        lambda request: httpx.Response(401, json={"detail": "Invalid token"})
+    )
     with pytest.raises(AppknoxAPIError, match="401.*Invalid token"):
         await client.get_file(5)
 
 
 async def test_error_message_surfaces_error_key() -> None:
-    client = _client(lambda request: httpx.Response(404, json={"error": "Not Found (404)"}))
+    client = _client(
+        lambda request: httpx.Response(404, json={"error": "Not Found (404)"})
+    )
     with pytest.raises(AppknoxAPIError, match="404.*Not Found"):
         await client.get_file(5)
 
@@ -91,7 +131,9 @@ async def test_error_message_surfaces_redirect_location() -> None:
             301, headers={"Location": "/api/public_api/v1/files/5/"}, text=""
         )
     )
-    with pytest.raises(AppknoxAPIError, match=r"301 redirected to /api/public_api/v1/files/5/"):
+    with pytest.raises(
+        AppknoxAPIError, match=r"301 redirected to /api/public_api/v1/files/5/"
+    ):
         await client.get_file(5)
 
 
@@ -112,7 +154,9 @@ async def test_request_error_surfaces_exception_text() -> None:
 
 async def test_list_projects_returns_results() -> None:
     client = _client(
-        lambda request: httpx.Response(200, json={"results": [{"id": 1}], "next": None})
+        lambda request: httpx.Response(
+            200, json={"results": [_project_json(1)], "next": None}
+        )
     )
     projects = await client.list_projects("com.x")
     assert [p.id for p in projects] == [1]
@@ -134,9 +178,12 @@ async def test_list_project_files_follows_pagination() -> None:
         if after == "0":
             return httpx.Response(
                 200,
-                json={"results": [{"id": 1}], "next": "http://test/p?starting_after=1"},
+                json={
+                    "results": [_file_json(1)],
+                    "next": "http://test/p?starting_after=1",
+                },
             )
-        return httpx.Response(200, json={"results": [{"id": 2}], "next": None})
+        return httpx.Response(200, json={"results": [_file_json(2)], "next": None})
 
     client = _client(handler)
     rows = await client.list_project_files(3)

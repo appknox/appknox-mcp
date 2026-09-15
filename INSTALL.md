@@ -256,12 +256,36 @@ project-scoped file.
 The MCP config above gets Claude Code the **tools**, but not `/appknox:triage`,
 `/appknox:fix`, `/appknox:upload`, `/appknox:verify`, or the `appknox-fixer`
 sub-agent — those only load if this repo is installed as a Claude Code
-**plugin**, which is a separate registration:
+**plugin**, which is a separate registration.
+
+**a) No-clone (preferred — works from a bare `uv tool install`, needs no
+GitHub access at all).** The wheel bundles the plugin's files; this extracts
+them to `~/.appknox-mcp/claude-plugin` and registers that local path:
 
 ```bash
-claude plugin marketplace add appknox/appknox-mcp   # or a local clone's path
+appknox-mcp --install-claude-plugin
+```
+
+**b) From a repo you already have cloned locally**, or the GitHub-hosted form
+(needs the repo on its default branch and — until it's public — doesn't
+reliably work; see below):
+
+```bash
+claude plugin marketplace add /path/to/appknox-mcp   # local clone's path
+# or: claude plugin marketplace add appknox/appknox-mcp
 claude plugin install appknox@appknox -y
 ```
+
+> **Two separate ways the GitHub-hosted form (b, second line) fails, easy to
+> confuse — (a) and (b)'s local-path form both sidestep both of these:**
+> 1. `.claude-plugin/marketplace.json` must exist **on the repo's default
+>    branch** (`develop`, not `main`) — `claude plugin marketplace add
+>    owner/repo` always clones that branch, never a feature branch.
+> 2. Even on the default branch, `claude plugin marketplace add owner/repo`
+>    does **not** reliably work against a private repo today — it clones via
+>    its own internal git (SSH needs a key already loaded in `ssh-agent`;
+>    HTTPS fails outright, ignoring `gh`/keychain credentials). See
+>    [anthropics/claude-code#17201](https://github.com/anthropics/claude-code/issues/17201).
 
 This installs at **user scope** (the default), so the commands/agent are
 available from any repo afterward, not just the one you ran this in. Commands
@@ -281,7 +305,7 @@ quit Claude Desktop with Cmd+Q; restart the Codex or Copilot CLI session; reopen
 Cursor). Then:
 
 - Claude Code / Codex / Copilot CLI: run `/mcp` — you should see `appknox` with
-  ~9 tools.
+  8 tools.
 - Claude Code only: run `claude plugin list` — you should see `appknox@appknox`
   enabled; try `/appknox:triage` to confirm the slash commands loaded.
 - Ask: *"list the Appknox tools"* — the agent should see `resolve_latest_file`,
