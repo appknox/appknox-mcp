@@ -30,9 +30,19 @@ _CODEX_BLOCK_PREFIX = f"[mcp_servers.{SERVER_KEY}"
 def _claude_desktop_path(home: Path) -> Path:
     """Return Claude Desktop's config path for the current OS."""
     if sys.platform == "darwin":
-        return home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+        return (
+            home
+            / "Library"
+            / "Application Support"
+            / "Claude"
+            / "claude_desktop_config.json"
+        )
     if sys.platform.startswith("win"):
-        return Path(os.environ.get("APPDATA", home)) / "Claude" / "claude_desktop_config.json"
+        return (
+            Path(os.environ.get("APPDATA", home))
+            / "Claude"
+            / "claude_desktop_config.json"
+        )
     return home / ".config" / "Claude" / "claude_desktop_config.json"
 
 
@@ -64,7 +74,9 @@ def _tool_entry(token: str, base_url: str) -> dict:
     }
 
 
-def _write_json(path: Path, top_key: str, entry: dict, extra: dict | None = None) -> None:
+def _write_json(
+    path: Path, top_key: str, entry: dict, extra: dict | None = None
+) -> None:
     """Merge ``entry`` under ``top_key`` into the JSON file at ``path``.
 
     ``extra`` holds keys merged into the entry itself (e.g. VS Code's ``type``).
@@ -75,7 +87,9 @@ def _write_json(path: Path, top_key: str, entry: dict, extra: dict | None = None
         try:
             data = json.loads(path.read_text() or "{}")
         except json.JSONDecodeError as exc:
-            raise SystemExit(f"✗ {path} is not valid JSON ({exc}); fix or remove it first.")
+            raise SystemExit(
+                f"✗ {path} is not valid JSON ({exc}); fix or remove it first."
+            )
     servers = data.setdefault(top_key, {})
     servers[SERVER_KEY] = {**entry, **(extra or {})}
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -122,7 +136,9 @@ def _remove_json(path: Path, top_key: str) -> None:
     try:
         data = json.loads(path.read_text() or "{}")
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"✗ {path} is not valid JSON ({exc}); fix or remove it manually.")
+        raise SystemExit(
+            f"✗ {path} is not valid JSON ({exc}); fix or remove it manually."
+        )
     servers = data.get(top_key, {})
     if SERVER_KEY not in servers:
         print(f"• No '{SERVER_KEY}' server in {path} — nothing to remove.")
@@ -160,6 +176,7 @@ def _claude_mcp_remove() -> None:
         ["claude", "mcp", "remove", SERVER_KEY, "--scope", "user"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        check=False,
     )
 
 
@@ -186,10 +203,10 @@ def _claude_mcp_add(entry: dict) -> None:
     # `--` stops `-e`'s variadic parsing from swallowing the positional args.
     args += ["--", SERVER_KEY, entry["command"], *entry["args"]]
 
-    result = subprocess.run(args, capture_output=True, text=True)
+    result = subprocess.run(args, capture_output=True, text=True, check=False)
     if result.returncode != 0 and "already exists" in result.stderr + result.stdout:
         _claude_mcp_remove()
-        result = subprocess.run(args, capture_output=True, text=True)
+        result = subprocess.run(args, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise SystemExit(
             f"✗ claude mcp add failed: {result.stderr.strip() or result.stdout.strip()}"
@@ -197,7 +214,15 @@ def _claude_mcp_add(entry: dict) -> None:
     print(f"✓ Registered {SERVER_KEY} with Claude Code (user scope, all your projects)")
 
 
-_CLIENTS = ("claude", "claude-desktop", "codex", "copilot", "cursor", "vscode", "windsurf")
+_CLIENTS = (
+    "claude",
+    "claude-desktop",
+    "codex",
+    "copilot",
+    "cursor",
+    "vscode",
+    "windsurf",
+)
 
 
 def _target(client: str, home: Path, cwd: Path) -> tuple[str, Path]:
@@ -268,7 +293,9 @@ def require_token() -> str:
     """
     token = os.environ.get(TOKEN_ENV, "")
     if not token:
-        raise SystemExit(f"✗ {TOKEN_ENV} env var is required (format: <AccessKeyID>:<Secret>).")
+        raise SystemExit(
+            f"✗ {TOKEN_ENV} env var is required (format: <AccessKeyID>:<Secret>)."
+        )
     return token
 
 
@@ -309,9 +336,13 @@ def remove_client(client: str, *, cwd: Path | None = None) -> Path:
 
 def main() -> None:
     """Parse args and write (or, with --remove, delete) the config for a client."""
-    parser = argparse.ArgumentParser(description="Configure the Appknox MCP server for a client.")
+    parser = argparse.ArgumentParser(
+        description="Configure the Appknox MCP server for a client."
+    )
     parser.add_argument("--client", required=True)
-    parser.add_argument("--repo", help="Absolute path to the MCP repo (run-from-source mode).")
+    parser.add_argument(
+        "--repo", help="Absolute path to the MCP repo (run-from-source mode)."
+    )
     parser.add_argument("--base-url", help="API base URL (required unless --remove).")
     parser.add_argument("--cwd", default=".", help="Dir for project-scoped configs.")
     parser.add_argument(
@@ -319,7 +350,9 @@ def main() -> None:
         action="store_true",
         help="Config for a `uv tool install`ed server (bare `appknox-mcp` command, no repo path).",
     )
-    parser.add_argument("--remove", action="store_true", help="Remove the appknox server entry.")
+    parser.add_argument(
+        "--remove", action="store_true", help="Remove the appknox server entry."
+    )
     args = parser.parse_args()
 
     cwd = Path(args.cwd).resolve()
@@ -331,9 +364,14 @@ def main() -> None:
     if not args.base_url:
         raise SystemExit("✗ --base-url is required when writing config.")
     configure_client(
-        args.client, require_token(), args.base_url, tool=args.tool, repo=args.repo, cwd=cwd
+        args.client,
+        require_token(),
+        args.base_url,
+        tool=args.tool,
+        repo=args.repo,
+        cwd=cwd,
     )
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

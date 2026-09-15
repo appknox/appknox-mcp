@@ -41,7 +41,7 @@ async def resolve_latest_file(
             "Upload a build first."
         )
 
-    project = max(scanned, key=lambda p: p.last_file_id)
+    project = max(scanned, key=lambda p: p.last_file_id or 0)
     return {
         "package_name": project.package_name,
         "project_id": project.id,

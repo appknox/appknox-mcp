@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from appknox_mcp.configure import main  # noqa: E402
+from appknox_mcp.configure import main
 
 if __name__ == "__main__":
     sys.exit(main())

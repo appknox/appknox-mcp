@@ -1,24 +1,21 @@
-name: Publish to Package Index
+name: Build, Attach & Publish Release
 
-# Fires when "Build & Release Wheel" (release.yml) finishes — NOT on the
-# `release: published` event directly. GitHub deliberately does not let an
-# event triggered by a workflow's own GITHUB_TOKEN cascade into triggering
-# another workflow (anti-recursion guard), and release.yml creates its
-# release with that default token — so `release: published` would never
-# fire this. Reacting to the upstream workflow's completion sidesteps that,
-# at the cost of one limitation: a release published by hand (GitHub UI or
-# `gh release create` outside of release.yml) will NOT trigger this, only
-# ones release.yml itself created.
+# Fires when a GitHub Release is published — created by YOU (GitHub UI's
+# "Draft a new release", or `gh release create <tag>` from your own login),
+# never by this workflow itself. That distinction matters: GitHub's
+# anti-recursion guard blocks an event created by a workflow's own
+# GITHUB_TOKEN from triggering other workflows, so a release this workflow
+# created would never actually fire `release: published` — which is exactly
+# why release creation now has to be a human action, not automated. In
+# exchange, you get full control: pick any tag (new or existing) and any
+# branch/commit as the release's target, from GitHub's own release UI.
 #
-# The `resolve` job below finds which release that run created by matching
-# target_commitish to the run's head_sha — release.yml always passes
-# `--target "$GITHUB_SHA"`, so this match is exact, never a guess.
-#
-# Routes on that release's prerelease flag:
-#   - prerelease (release.yml's default) -> TestPyPI. A safe, repeatable dry
-#     run of this exact pipeline (build, OIDC auth, publish) before anything
-#     ever touches the real index.
-#   - a real release (prerelease: false) -> PyPI.
+# Verifies pyproject.toml's version at that exact commit matches the tag you
+# chose (a mismatch almost always means you forgot to bump the version before
+# tagging), then tests, builds the wheel + sdist, smoke-tests the BUILT wheel,
+# attaches both to the release you created, and publishes:
+#   - "Set as a pre-release" checked  -> TestPyPI (safe, repeatable dry run)
+#   - unchecked (a real release)      -> PyPI
 #
 # Requires one-time setup on both index's side before this can succeed —
 # nothing here works until you do this by hand (PyPI Trusted Publishing has no
@@ -33,62 +30,49 @@ name: Publish to Package Index
 #      "testpypi" and "pypi" (the names must match what you registered above).
 #      Optionally add required reviewers to the "pypi" environment for a manual
 #      gate on real publishes.
-# No secrets to create or store — Trusted Publishing uses the publish job's
-# OIDC token (the `id-token: write` permission below), which is why the
-# environment name has to match exactly.
+# No secrets to create or store — Trusted Publishing uses this job's own OIDC
+# token (the `id-token: write` permission below), which is why the workflow
+# filename and environment name both have to match exactly what you registered.
 on:
-  workflow_run:
-    workflows: ["Build & Release Wheel"]
-    types: [completed]
-
-permissions:
-  contents: read
+  release:
+    types: [published]
 
 jobs:
-  resolve:
-    if: github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.find.outputs.tag }}
-      prerelease: ${{ steps.find.outputs.prerelease }}
-    steps:
-      - name: Find the release this run created
-        id: find
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          set -euo pipefail
-          RELEASE_JSON=$(gh api "repos/${{ github.repository }}/releases" \
-            | jq -r --arg sha "$SHA" '[.[] | select(.target_commitish == $sha)] | first // empty')
-          if [ -z "$RELEASE_JSON" ]; then
-            echo "::error::No release found with target_commitish=$SHA (from run ${{ github.event.workflow_run.id }})"
-            exit 1
-          fi
-          echo "tag=$(echo "$RELEASE_JSON" | jq -r .tag_name)" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$(echo "$RELEASE_JSON" | jq -r .prerelease)" >> "$GITHUB_OUTPUT"
-
   publish:
-    needs: resolve
     runs-on: ubuntu-latest
     # Has to be resolved here, not inside a step — environment protection
-    # rules are evaluated before the job's steps run.
-    environment: ${{ needs.resolve.outputs.prerelease == 'true' && 'testpypi' || 'pypi' }}
+    # rules are evaluated before the job's steps run. github.event.release is
+    # available directly since this triggers on the release event itself —
+    # no separate lookup job needed (unlike when we reacted to a workflow_run).
+    environment: ${{ github.event.release.prerelease && 'testpypi' || 'pypi' }}
     permissions:
-      id-token: write # PyPI/TestPyPI Trusted Publishing (OIDC) — no stored token
-      contents: read
+      contents: write # to attach the wheel/sdist to the release you created
+      id-token: write # PyPI/TestPyPI Trusted Publishing (OIDC)
     env:
-      # Dummy token so importing the server / running tests never blocks on auth.
-      # Not a credential — see the identical note in release.yml.
+      # Dummy token so importing the server / running tests never blocks on
+      # auth. Not a credential — the server accepts an empty/placeholder
+      # token and only fails on an actual API call, which this never makes.
       APPKNOX_ACCESS_TOKEN: "PLACEHOLDER:PLACEHOLDER"
     steps:
       - uses: actions/checkout@v4
         with:
-          # Publish exactly what was tagged, not whatever HEAD happens to be.
-          ref: ${{ needs.resolve.outputs.tag }}
+          # Build exactly what you tagged, not whatever the default branch's
+          # HEAD happens to be.
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
+
+      - name: Verify pyproject.toml's version matches the release tag
+        run: |
+          EXPECTED="v$(uv version --short)"
+          TAG="${{ github.event.release.tag_name }}"
+          if [ "$TAG" != "$EXPECTED" ]; then
+            echo "::error::Release tag '$TAG' doesn't match pyproject.toml's version"\
+              "('$EXPECTED' at this commit). Bump the version to match before"\
+              "tagging, or delete this release and re-tag."
+            exit 1
+          fi
 
       - name: Run tests
         run: uv run pytest -q
@@ -96,20 +80,34 @@ jobs:
       - name: Build wheel + sdist
         run: uv build
 
+      - name: Smoke-test the built wheel (import + tool count) in a clean venv
+        run: |
+          uv venv /tmp/verify
+          uv pip install --python /tmp/verify/bin/python dist/*.whl
+          # Run from /tmp so a source-relative file (e.g. the repo's docs/) can't
+          # mask a packaging bug — this is exactly what caught the spec-load crash.
+          cd /tmp
+          /tmp/verify/bin/python -c "import asyncio, appknox_mcp.server as s; n=len(asyncio.run(s.mcp.list_tools())); print(f'built wheel OK — {n} tools'); assert n >= 7, n"
+
+      - name: Attach wheel + sdist to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/*.whl dist/*.tar.gz --clobber
+
       - name: Publish to TestPyPI (prerelease dry run)
-        if: needs.resolve.outputs.prerelease == 'true'
+        if: github.event.release.prerelease
         run: uv publish --index testpypi
 
       - name: Publish to PyPI
-        if: needs.resolve.outputs.prerelease != 'true'
+        if: ${{ !github.event.release.prerelease }}
         run: uv publish
 
       - name: Summary
         run: |
-          if [ "${{ needs.resolve.outputs.prerelease }}" = "true" ]; then
+          if [ "${{ github.event.release.prerelease }}" = "true" ]; then
             echo "### Published to TestPyPI :test_tube:" >> "$GITHUB_STEP_SUMMARY"
-            echo "Verify with: \`uv tool install --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ appknox-mcp\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "Verify with: \`uv tool install --reinstall --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --index-strategy unsafe-best-match appknox-mcp\`" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "### Published to PyPI :rocket:" >> "$GITHUB_STEP_SUMMARY"
-            echo "Verify with: \`uv tool install appknox-mcp\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "Verify with: \`uv tool install --reinstall appknox-mcp\`" >> "$GITHUB_STEP_SUMMARY"
           fi

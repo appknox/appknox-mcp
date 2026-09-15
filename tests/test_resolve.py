@@ -33,14 +33,16 @@ def fake_projects(monkeypatch: pytest.MonkeyPatch):
 
 async def test_resolve_returns_latest_file(fake_projects) -> None:
     client = fake_projects(
-        [{
-            "id": 1,
-            "package_name": "com.appknox.mfva",
-            "platform": 0,
-            "platform_display": "Android",
-            "last_file_id": 5,
-            "file_count": 3,
-        }]
+        [
+            {
+                "id": 1,
+                "package_name": "com.appknox.mfva",
+                "platform": 0,
+                "platform_display": "Android",
+                "last_file_id": 5,
+                "file_count": 3,
+            }
+        ]
     )
 
     out = await resolve.resolve_latest_file("com.appknox.mfva")
@@ -60,10 +62,26 @@ async def test_resolve_no_project_raises(fake_projects) -> None:
 async def test_multiple_matches_uses_newest_build(fake_projects) -> None:
     # Same identifier on two projects (no platform passed): pick the newest build,
     # don't error.
-    fake_projects([
-        {"id": 1, "package_name": "com.dupe.app", "platform_display": "Android", "last_file_id": 5},
-        {"id": 2, "package_name": "com.dupe.app", "platform_display": "Android", "last_file_id": 8},
-    ])
+    fake_projects(
+        [
+            {
+                "id": 1,
+                "package_name": "com.dupe.app",
+                "platform": 0,
+                "platform_display": "Android",
+                "last_file_id": 5,
+                "file_count": 5,
+            },
+            {
+                "id": 2,
+                "package_name": "com.dupe.app",
+                "platform": 0,
+                "platform_display": "Android",
+                "last_file_id": 8,
+                "file_count": 8,
+            },
+        ]
+    )
     out = await resolve.resolve_latest_file("com.dupe.app")
     assert out["project_id"] == 2 and out["file_id"] == 8
 
@@ -71,8 +89,22 @@ async def test_multiple_matches_uses_newest_build(fake_projects) -> None:
 async def test_platform_disambiguates_shared_identifier(fake_projects) -> None:
     # Android and iOS projects share the identifier; the API returns both.
     both = [
-        {"id": 1, "package_name": "com.shared.app", "platform_display": "Android", "last_file_id": 5},
-        {"id": 2, "package_name": "com.shared.app", "platform_display": "iOS", "last_file_id": 9},
+        {
+            "id": 1,
+            "package_name": "com.shared.app",
+            "platform": 0,
+            "platform_display": "Android",
+            "last_file_id": 5,
+            "file_count": 5,
+        },
+        {
+            "id": 2,
+            "package_name": "com.shared.app",
+            "platform": 1,
+            "platform_display": "iOS",
+            "last_file_id": 9,
+            "file_count": 9,
+        },
     ]
     fake_projects(both)
     ios = await resolve.resolve_latest_file("com.shared.app", platform="ios")
@@ -84,12 +116,34 @@ async def test_platform_disambiguates_shared_identifier(fake_projects) -> None:
 
 
 async def test_platform_no_match_raises(fake_projects) -> None:
-    fake_projects([{"id": 1, "platform_display": "Android", "last_file_id": 5}])
+    fake_projects(
+        [
+            {
+                "id": 1,
+                "package_name": "com.only.android",
+                "platform": 0,
+                "platform_display": "Android",
+                "last_file_id": 5,
+                "file_count": 5,
+            }
+        ]
+    )
     with pytest.raises(AppknoxAPIError, match=r"\(ios\)"):
         await resolve.resolve_latest_file("com.only.android", platform="ios")
 
 
 async def test_resolve_no_scanned_file_raises(fake_projects) -> None:
-    fake_projects([{"id": 1, "package_name": "com.x", "last_file_id": None}])
+    fake_projects(
+        [
+            {
+                "id": 1,
+                "package_name": "com.x",
+                "platform": 0,
+                "platform_display": "Android",
+                "last_file_id": None,
+                "file_count": 0,
+            }
+        ]
+    )
     with pytest.raises(AppknoxAPIError, match="scanned file"):
         await resolve.resolve_latest_file("com.x")

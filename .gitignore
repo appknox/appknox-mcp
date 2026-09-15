@@ -10,3 +10,4 @@ uv.lock
 .zed/
 .DS_Store
 CLAUDE.md
+.claude/

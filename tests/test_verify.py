@@ -34,7 +34,9 @@ def _patch(
     async def fake_status(_file_id: int) -> dict[str, Any]:
         return ready
 
-    async def fake_list(file_id: int, min_risk: int | None = None, include_exploitability: bool = True) -> list:
+    async def fake_list(
+        file_id: int, min_risk: int | None = None, include_exploitability: bool = True
+    ) -> list:
         return by_file.get(file_id, [])
 
     async def fake_prev(_file_id: int) -> int | None:
@@ -76,7 +78,9 @@ async def test_verify_by_old_file_diff(monkeypatch: pytest.MonkeyPatch) -> None:
     assert {r["vulnerability_id"] for r in out["new_or_regressed"]} == {1003}
 
 
-async def test_verify_auto_derives_previous_build(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_verify_auto_derives_previous_build(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # No old_file_id / vulnerability_ids given: baseline defaults to the previous build (1).
     _patch(
         monkeypatch,
@@ -93,26 +97,38 @@ async def test_verify_auto_derives_previous_build(monkeypatch: pytest.MonkeyPatc
     assert {r["vulnerability_id"] for r in out["still_open"]} == {1002}
 
 
-async def test_verify_first_build_has_no_baseline(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_verify_first_build_has_no_baseline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _patch(monkeypatch, {"ready": True}, {2: []}, prev=None)
     out = await verify.knoxiq_verify_fixes(2)
     assert out["old_file_id"] is None
     assert "first build" in out["message"]
 
 
-async def test_verify_baseline_with_no_open_findings(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_verify_baseline_with_no_open_findings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _patch(monkeypatch, {"ready": True}, {5: [], 2: []}, prev=5)
     out = await verify.knoxiq_verify_fixes(2)
     assert out["summary"]["checked"] == 0
     assert "Nothing to compare" in out["message"]
 
 
-async def test_still_open_carries_exploitability(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_still_open_carries_exploitability(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # 1001 stays open in the new build, but its exploitability dropped after the fix.
     _patch(
         monkeypatch,
         {"ready": True},
-        {2: [_row(1001, "A", exploitability_score=2.0, exploitability_likelihood="Low")]},
+        {
+            2: [
+                _row(
+                    1001, "A", exploitability_score=2.0, exploitability_likelihood="Low"
+                )
+            ]
+        },
     )
     out = await verify.knoxiq_verify_fixes(2, vulnerability_ids=[1001])
     [entry] = out["still_open"]
