@@ -1,0 +1,34 @@
+# Installed with `uv run pre-commit install` (one-time, per clone) so these
+# run automatically on `git commit`. CI (.github/workflows/ci.yml) runs the
+# same checks via `uv run pre-commit run --all-files` — a pre-commit hook is
+# opt-in locally and skippable with `--no-verify`, so CI is what actually
+# enforces this on every PR, not just a courtesy for whoever remembers to
+# install it.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+
+  - repo: https://github.com/psf/black
+    rev: 25.9.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.7
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.18.2
+    hooks:
+      - id: mypy
+        additional_dependencies: ["fastmcp>=2.0.0,<4.0.0", "httpx>=0.27.0", "pydantic>=2.0.0"]
+        files: ^src/

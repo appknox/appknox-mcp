@@ -40,7 +40,13 @@ async def previous_file_id(file_id: int) -> int | None:
 # is that enum, kept in sync with mycroft's ExploitabilityEnum. Note the top
 # tier here is "High", not "Critical" — a different, shorter scale than
 # computed_risk's (which does have a Critical tier); don't conflate the two.
-_EXPLOITABILITY_LIKELIHOOD_DISPLAY = {0: "Unknown", 1: "Passed", 2: "Low", 3: "Medium", 4: "High"}
+_EXPLOITABILITY_LIKELIHOOD_DISPLAY = {
+    0: "Unknown",
+    1: "Passed",
+    2: "Low",
+    3: "Medium",
+    4: "High",
+}
 
 
 def _to_row(analysis: Analysis, include_exploitability: bool) -> dict[str, Any]:
@@ -100,9 +106,7 @@ async def list_analyses(
         ]
     if min_exploitability is not None:
         analyses = [
-            a
-            for a in analyses
-            if (a.exploitability_score or 0.0) >= min_exploitability
+            a for a in analyses if (a.exploitability_score or 0.0) >= min_exploitability
         ]
     # Exploitability first, severity as tiebreak — KnoxIQ's signal for what to
     # fix first (see instructions.py step 3). Sorted here, not left to each
@@ -148,7 +152,10 @@ async def knoxiq_get_fix_plan(
     it fetches the full finding payload, which is heavier than `list_analyses`.
     """
     results = await asyncio.gather(
-        *(client.list_knoxiq_findings(file_id, analysis_id) for analysis_id in analysis_ids)
+        *(
+            client.list_knoxiq_findings(file_id, analysis_id)
+            for analysis_id in analysis_ids
+        )
     )
     return [
         {

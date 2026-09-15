@@ -108,7 +108,6 @@ async def knoxiq_get_scan_status(file_id: int) -> dict[str, Any]:
         "platform_display": file.platform_display,
         "sast_status": file.sast_status,
         "dast_status": file.dast_status,
-        "static_scan_progress": file.static_scan_progress,
         "knoxiq_status": label,
         "knoxiq_status_code": code,
         "ready": ready,

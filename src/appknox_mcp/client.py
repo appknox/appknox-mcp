@@ -61,7 +61,11 @@ def _error_detail(response: httpx.Response) -> str:
     """
     if response.is_redirect:
         location = response.headers.get("location")
-        return f"redirected to {location}" if location else "redirected (no Location header)"
+        return (
+            f"redirected to {location}"
+            if location
+            else "redirected (no Location header)"
+        )
     try:
         body = response.json()
     except ValueError:
@@ -81,7 +85,7 @@ class AppknoxClient:
         base_url: str,
         access_token: str,
         timeout: float = 30.0,
-        transport: httpx.BaseTransport | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._http = httpx.AsyncClient(
             base_url=_ensure_https(base_url),
@@ -105,7 +109,9 @@ class AppknoxClient:
 
     async def list_projects(self, package_name: str) -> list[Project]:
         """List projects matching an app identifier (package_name / bundle id)."""
-        payload = await self._get(f"{_V1}/projects", params={"package_name": package_name})
+        payload = await self._get(
+            f"{_V1}/projects", params={"package_name": package_name}
+        )
         return [Project.model_validate(row) for row in payload.get("results", [])]
 
     # -- Analyses / KnoxIQ findings -----------------------------------------
@@ -156,10 +162,14 @@ class AppknoxClient:
 
     # -- HTTP primitives -----------------------------------------------------
 
-    async def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def _get(
+        self, path: str, params: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         return await self._request("GET", path, params=params)
 
-    async def _post(self, path: str, json: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def _post(
+        self, path: str, json: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         return await self._request("POST", path, json=json)
 
     async def _paginate(

@@ -19,13 +19,53 @@ def _analysis(
         "vulnerability_id": 1000 + analysis_id,
         "vulnerability_name": f"Vuln {analysis_id}",
         "computed_risk": computed_risk,
-        "computed_risk_display": {4: "Critical", 3: "High", 2: "Medium"}.get(computed_risk, "Low"),
+        "computed_risk_display": {4: "Critical", 3: "High", 2: "Medium"}.get(
+            computed_risk, "Low"
+        ),
         "cvss_base": "7.5",
         "vulnerability_scan_types": ["SAST"],
         "cwe": ["CWE-89"],
         "exploitability_score": exploitability_score,
         "exploitability_likelihood": exploitability_likelihood,
     }
+
+
+def _file(**overrides: Any) -> dict[str, Any]:
+    """A minimal but complete File payload, with overrides for the field(s) a test cares about."""
+    base = {
+        "id": 1,
+        "name": "App",
+        "package_name": "com.x",
+        "version": "1.0",
+        "version_code": "1",
+        "platform": 0,
+        "platform_display": "Android",
+        "project_id": 1,
+        "sast_status": "Completed",
+        "dast_status": "Not Started",
+        "risk_count_critical": 0,
+        "risk_count_high": 0,
+        "risk_count_medium": 0,
+        "risk_count_low": 0,
+        "risk_count_passed": 0,
+        "risk_count_untested": 0,
+        "is_last_file": True,
+    }
+    base.update(overrides)
+    return base
+
+
+def _knoxiq_finding(**overrides: Any) -> dict[str, Any]:
+    """A minimal but complete KnoxIQFinding payload."""
+    base = {
+        "finding_id": "F-0",
+        "title": "Finding",
+        "description": "Description",
+        "scan_type": 0,
+        "scan_id": 1,
+    }
+    base.update(overrides)
+    return base
 
 
 class _FakeClient:
@@ -92,9 +132,19 @@ async def test_get_file_info_returns_selected_fields(fake_client) -> None:
                 "name": "MyApp",
                 "package_name": "com.example.app",
                 "version": "1.2.3",
+                "version_code": "1",
                 "platform": 0,
                 "platform_display": "Android",
+                "project_id": 1,
+                "sast_status": "Completed",
+                "dast_status": "Not Started",
                 "risk_count_critical": 2,
+                "risk_count_high": 0,
+                "risk_count_medium": 0,
+                "risk_count_low": 0,
+                "risk_count_passed": 0,
+                "risk_count_untested": 0,
+                "is_last_file": True,
                 "internal_secret": "must-not-leak",
             }
         }
@@ -111,7 +161,9 @@ async def test_get_file_info_returns_selected_fields(fake_client) -> None:
 async def test_min_risk_filters_without_calling_knoxiq_findings(fake_client) -> None:
     client = fake_client(analyses={1: [_analysis(1, 4), _analysis(2, 1)]})
 
-    rows = await findings.list_analyses(file_id=1, min_risk=4, include_exploitability=False)
+    rows = await findings.list_analyses(
+        file_id=1, min_risk=4, include_exploitability=False
+    )
 
     assert [r["id"] for r in rows] == [1]
     assert not any(c[0] == "list_knoxiq_findings" for c in client.calls)
@@ -159,10 +211,18 @@ async def test_list_analyses_sorts_by_exploitability_then_risk(fake_client) -> N
     fake_client(
         analyses={
             1: [
-                _analysis(1, computed_risk=4, exploitability_score=2.0),  # Critical, low exploit
-                _analysis(2, computed_risk=2, exploitability_score=9.0),  # Medium, high exploit
-                _analysis(3, computed_risk=3, exploitability_score=9.0),  # High, tied exploit
-                _analysis(4, computed_risk=1, exploitability_score=None),  # Low, no score
+                _analysis(
+                    1, computed_risk=4, exploitability_score=2.0
+                ),  # Critical, low exploit
+                _analysis(
+                    2, computed_risk=2, exploitability_score=9.0
+                ),  # Medium, high exploit
+                _analysis(
+                    3, computed_risk=3, exploitability_score=9.0
+                ),  # High, tied exploit
+                _analysis(
+                    4, computed_risk=1, exploitability_score=None
+                ),  # Low, no score
             ]
         }
     )
@@ -185,21 +245,19 @@ async def test_include_exploitability_false_drops_fields(fake_client) -> None:
 
 async def test_previous_file_id_returns_prior_build(fake_client) -> None:
     fake_client(
-        files={9: {"id": 9, "project_id": 3}},
-        project_files={3: [{"id": 9}, {"id": 7}, {"id": 4}]},
+        files={9: _file(id=9, project_id=3)},
+        project_files={3: [_file(id=9), _file(id=7), _file(id=4)]},
     )
     assert await findings.previous_file_id(9) == 7
 
 
 async def test_previous_file_id_none_for_first_build(fake_client) -> None:
-    fake_client(files={9: {"id": 9, "project_id": 3}}, project_files={3: [{"id": 9}]})
+    fake_client(files={9: _file(id=9, project_id=3)}, project_files={3: [_file(id=9)]})
     assert await findings.previous_file_id(9) is None
 
 
 async def test_knoxiq_get_fix_plan_fetches_only_requested_ids(fake_client) -> None:
-    client = fake_client(
-        knoxiq={(1, 1): [{"finding_id": "F-0", "developer_prompt": "fix it"}]}
-    )
+    client = fake_client(knoxiq={(1, 1): [_knoxiq_finding(developer_prompt="fix it")]})
 
     plan = await findings.knoxiq_get_fix_plan(file_id=1, analysis_ids=[1])
 
@@ -210,10 +268,11 @@ async def test_knoxiq_get_fix_plan_fetches_only_requested_ids(fake_client) -> No
 
 
 async def test_knoxiq_prepare_fix_returns_one_findings_set(fake_client) -> None:
-    poc = {"poc_title": "t", "verification_steps": [{"step_number": 1, "command": "grep x"}]}
-    fake_client(
-        knoxiq={(9, 405): [{"finding_id": "F-0", "developer_prompt": "do it", "poc": poc}]}
-    )
+    poc = {
+        "poc_title": "t",
+        "verification_steps": [{"step_number": 1, "command": "grep x"}],
+    }
+    fake_client(knoxiq={(9, 405): [_knoxiq_finding(developer_prompt="do it", poc=poc)]})
 
     result = await findings.knoxiq_prepare_fix(9, 405)
 
