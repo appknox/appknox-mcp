@@ -1,0 +1,53 @@
+[project]
+name = "appknox-mcp"
+version = "0.1.1"
+description = "MCP server for the Appknox mobile app security platform"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Appknox" }]
+dependencies = [
+    # Upper-bounded deliberately: fastmcp 4.x broke real MCP clients calling
+    # our tools (confirmed live — a client got "Invalid request parameters"
+    # on every call after a fresh `uv tool install` silently jumped 3.4.6,
+    # the version this project is actually tested against, to 4.0.3). `uv
+    # tool install` does a brand-new resolution every time — it does NOT
+    # consult uv.lock the way `uv sync` does — so an unbounded floor here
+    # means any future reinstall can silently pull an untested major version.
+    "fastmcp>=2.0.0,<4.0.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.0.0",
+]
+
+[project.scripts]
+appknox-mcp = "appknox_mcp.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+# Publish target for the dry-run pipeline (.github/workflows/publish.yml).
+# `explicit = true` keeps it out of normal dependency resolution — `uv sync` never
+# looks here — it's only used when a command names it via `--index testpypi`.
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Bundle INSTALL.md into the wheel so it's readable after `uv tool install`/`pip
+# install`, with no repo clone or network fetch needed — `appknox-mcp
+# --install-guide` prints it (see server.py). Single source of truth: this
+# repo's top-level INSTALL.md, just relocated inside the package at build time.
+[tool.hatch.build.targets.wheel.force-include]
+"INSTALL.md" = "appknox_mcp/INSTALL.md"

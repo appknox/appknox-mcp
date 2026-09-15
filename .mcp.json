@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "appknox": {
+      "command": "uv",
+      "args": ["run", "appknox-mcp"],
+      "env": {
+        "APPKNOX_ACCESS_TOKEN": "${APPKNOX_ACCESS_TOKEN}",
+        "APPKNOX_BASE_URL": "${APPKNOX_BASE_URL}"
+      }
+    }
+  }
+}

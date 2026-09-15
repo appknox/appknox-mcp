@@ -9,3 +9,4 @@ build/
 uv.lock
 .zed/
 .DS_Store
+CLAUDE.md
