@@ -1,5 +1,7 @@
 # Appknox MCP Server
 
+[![PyPI version](https://img.shields.io/pypi/v/appknox-mcp.svg)](https://pypi.org/project/appknox-mcp/)
+
 An [MCP](https://modelcontextprotocol.io) server that connects your AI coding
 agent to [Appknox](https://www.appknox.com) KnoxIQ, so it can **fetch the
 vulnerabilities Appknox found in your app, fix them in your repo, and verify each
