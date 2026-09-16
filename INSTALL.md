@@ -47,26 +47,12 @@ uv tool install --reinstall appknox-mcp
 ```
 Only fall through to (b) if this fails.
 
-**b) From a released wheel.**
-The repo is **private for now**, so download the wheel with the GitHub CLI (it
-uses the user's existing `gh`/GitHub auth), then install the local file:
-
+**b) From git (no release needed).**
 ```bash
-gh release download --repo appknox/appknox-mcp --pattern '*.whl' --dir /tmp/appknox-mcp
-uv tool install --reinstall /tmp/appknox-mcp/*.whl
-```
-Add `<tag>` (e.g. `v0.1.0`) as the first arg to `gh release download` to pin a
-version; omit it for the latest. **When the repo is public**, skip `gh` entirely
-and install straight from the asset URL:
-`uv tool install --reinstall "https://github.com/appknox/appknox-mcp/releases/latest/download/appknox_mcp-<version>-py3-none-any.whl"`.
-
-**c) From git (no release needed).**
-```bash
-uv tool install --reinstall "git+ssh://git@github.com/appknox/appknox-mcp@develop"   # private: uses the user's SSH key
-# public: uv tool install --reinstall "git+https://github.com/appknox/appknox-mcp@develop"
+uv tool install --reinstall "git+https://github.com/appknox/appknox-mcp@develop"
 ```
 
-**d) From a local checkout** (if the user already cloned it):
+**c) From a local checkout** (if the user already cloned it):
 `uv tool install --reinstall /path/to/appknox-mcp`.
 
 Then verify — `command -v appknox-mcp` only proves *a* binary is on PATH, not
@@ -83,8 +69,8 @@ didn't actually take — re-run step 1's command with `--reinstall` (if you
 skipped it) rather than assuming this step is broken.
 
 To update later: `uv tool upgrade appknox-mcp` (works regardless of which
-source it was originally installed from) or re-run the `gh release download` +
-`uv tool install --reinstall` step for a newer wheel.
+source it was originally installed from), or re-run step 1's command with
+`--reinstall` for a newer version.
 
 ## 2. Ask the user for credentials
 
@@ -92,10 +78,9 @@ Prompt the user for three things (from Appknox dashboard → **Service Accounts*
 
 1. **Access Key ID**
 2. **Secret Access Key**
-3. **Base URL** — the API host for their Appknox instance. Don't assume a
+3. **Base URL** — the Appknox Public API host for their instance. Don't assume a
    default: white-labeled deployments use a different host, so ask rather than
-   guess (their dashboard has it if they're unsure; Appknox's own KnoxIQ beta
-   host is `https://sherlock-mcp.staging.appknox.io`, for reference only).
+   guess (their dashboard has it if they're unsure).
 
 Combine the first two into the token the server expects:
 `APPKNOX_ACCESS_TOKEN = "<Access Key ID>:<Secret Access Key>"` (a single colon
@@ -129,7 +114,7 @@ Key is `mcpServers`. Files:
       "command": "appknox-mcp",
       "env": {
         "APPKNOX_ACCESS_TOKEN": "<Access Key ID>:<Secret Access Key>",
-        "APPKNOX_BASE_URL": "<your Appknox base URL>"
+        "APPKNOX_BASE_URL": "https://publicapi.appknox.com"
       }
     }
   }
@@ -151,7 +136,7 @@ Key is `mcpServers` too, but each entry additionally needs `"type": "local"`
       "args": [],
       "env": {
         "APPKNOX_ACCESS_TOKEN": "<Access Key ID>:<Secret Access Key>",
-        "APPKNOX_BASE_URL": "<your Appknox base URL>"
+        "APPKNOX_BASE_URL": "https://publicapi.appknox.com"
       },
       "tools": ["*"]
     }
@@ -189,7 +174,7 @@ Key is `servers` and the entry needs `"type": "stdio"`:
     "appknox": {
       "type": "stdio",
       "command": "appknox-mcp",
-      "env": { "APPKNOX_ACCESS_TOKEN": "…", "APPKNOX_BASE_URL": "…" }
+      "env": { "APPKNOX_ACCESS_TOKEN": "…", "APPKNOX_BASE_URL": "https://publicapi.appknox.com" }
     }
   }
 }
@@ -219,7 +204,7 @@ args = []
 
 [mcp_servers.appknox.env]
 APPKNOX_ACCESS_TOKEN = "<Access Key ID>:<Secret Access Key>"
-APPKNOX_BASE_URL = "<your Appknox base URL>"
+APPKNOX_BASE_URL = "https://publicapi.appknox.com"
 ```
 
 > You can skip writing any of the JSON/TOML above by hand and instead let the
@@ -258,9 +243,7 @@ them to `~/.appknox-mcp/claude-plugin` and registers that local path:
 appknox-mcp --install-claude-plugin
 ```
 
-**b) From a repo you already have cloned locally**, or the GitHub-hosted form
-(needs the repo on its default branch and — until it's public — doesn't
-reliably work; see below):
+**b) From a repo you already have cloned locally**, or the GitHub-hosted form:
 
 ```bash
 claude plugin marketplace add /path/to/appknox-mcp   # local clone's path
@@ -268,16 +251,11 @@ claude plugin marketplace add /path/to/appknox-mcp   # local clone's path
 claude plugin install appknox@appknox -y
 ```
 
-> **Two separate ways the GitHub-hosted form (b, second line) fails, easy to
-> confuse — (a) and (b)'s local-path form both sidestep both of these:**
-> 1. `.claude-plugin/marketplace.json` must exist **on the repo's default
->    branch** (`develop`, not `main`) — `claude plugin marketplace add
->    owner/repo` always clones that branch, never a feature branch.
-> 2. Even on the default branch, `claude plugin marketplace add owner/repo`
->    does **not** reliably work against a private repo today — it clones via
->    its own internal git (SSH needs a key already loaded in `ssh-agent`;
->    HTTPS fails outright, ignoring `gh`/keychain credentials). See
->    [anthropics/claude-code#17201](https://github.com/anthropics/claude-code/issues/17201).
+> The GitHub-hosted form (second line above) needs
+> `.claude-plugin/marketplace.json` to exist **on the repo's default branch**
+> (`develop`, not `main`) — `claude plugin marketplace add owner/repo` always
+> clones that branch, never a feature branch. If it's ever missing there
+> (e.g. mid-migration), use the local-path form instead.
 
 This installs at **user scope** (the default), so the commands/agent are
 available from any repo afterward, not just the one you ran this in. Commands

@@ -157,7 +157,7 @@ if [ "${#SELECTED[@]}" -gt 0 ]; then
   export APPKNOX_ACCESS_TOKEN
 
   if [ -z "${BASE_URL:-}" ]; then
-    info "The API host for your Appknox instance — check your dashboard if unsure."
+    info "The Appknox Public API host for your instance — check your dashboard if unsure."
     info "(e.g. $DEFAULT_BASE_URL for Appknox's own KnoxIQ beta — white-labeled"
     info "deployments use a different host, so don't assume this one.)"
     printf '  base URL> '
@@ -227,7 +227,7 @@ if [ "$SHOW_GENERIC" -eq 1 ]; then
       "args": ["run", "--directory", "$REPO_DIR", "appknox-mcp"],
       "env": {
         "APPKNOX_ACCESS_TOKEN": "<Access Key ID>:<Secret Access Key>",
-        "APPKNOX_BASE_URL": "<your Appknox base URL>"
+        "APPKNOX_BASE_URL": "https://publicapi.appknox.com"
       }
     }
 

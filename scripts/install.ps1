@@ -151,7 +151,7 @@ if ($Selected.Count -gt 0) {
     if (-not $env:APPKNOX_ACCESS_TOKEN) { Die "No access token provided." }
 
     if (-not $BaseUrl) {
-        Write-Info "The API host for your Appknox instance - check your dashboard if unsure."
+        Write-Info "The Appknox Public API host for your instance - check your dashboard if unsure."
         Write-Info "(e.g. $DefaultBaseUrl for Appknox's own KnoxIQ beta - white-labeled"
         Write-Info "deployments use a different host, so don't assume this one.)"
         $BaseUrl = Read-Host "  base URL"
@@ -218,7 +218,7 @@ if ($ShowGeneric) {
       "args": ["run", "--directory", "$RepoDir", "appknox-mcp"],
       "env": {
         "APPKNOX_ACCESS_TOKEN": "<Access Key ID>:<Secret Access Key>",
-        "APPKNOX_BASE_URL": "<your Appknox base URL>"
+        "APPKNOX_BASE_URL": "https://publicapi.appknox.com"
       }
     }
 
