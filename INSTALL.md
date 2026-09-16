@@ -45,15 +45,7 @@ stopping at the first that works**; all produce a location-independent
 ```bash
 uv tool install --reinstall appknox-mcp
 ```
-Not live yet — while `appknox-mcp` is only on TestPyPI, install from there
-instead (needs `--extra-index-url` since deps like `fastmcp` aren't on
-TestPyPI, and `--index-strategy unsafe-best-match` to let `uv` resolve across
-both indexes):
-```bash
-uv tool install --reinstall --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --index-strategy unsafe-best-match appknox-mcp
-```
-Once it's on real PyPI, switch to the plain command above and skip straight to
-verifying — only fall through to (b) if both of these fail.
+Only fall through to (b) if this fails.
 
 **b) From a released wheel.**
 The repo is **private for now**, so download the wheel with the GitHub CLI (it

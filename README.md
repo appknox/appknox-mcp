@@ -25,8 +25,7 @@ nothing else to keep in sync here:
 
 ```
 Install the appknox-mcp MCP server for me:
-1. `uv tool install --reinstall --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --index-strategy unsafe-best-match appknox-mcp`
-   (once it's on real PyPI, just: `uv tool install --reinstall appknox-mcp`) —
+1. `uv tool install --reinstall appknox-mcp` —
    **always include `--reinstall`**: without it, `uv` silently does nothing if
    any version is already installed, even a stale one missing this exact flag.
 2. Run `appknox-mcp --install-guide` and follow it exactly.

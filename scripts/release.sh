@@ -5,11 +5,11 @@
 # bump straight to develop is just you, an admin, pushing directly (exactly
 # like any other commit you'd make), and creating the release with your own
 # `gh` login is what triggers .github/workflows/publish.yml (which does the
-# actual build/test/publish to TestPyPI or PyPI via Trusted Publishing — no
-# version number to type there either, it reads pyproject.toml itself).
+# actual build/test/publish to PyPI via Trusted Publishing — no version
+# number to type there either, it reads pyproject.toml itself).
 #
-#   ./scripts/release.sh patch              # bump, tag, release to TestPyPI (default)
-#   ./scripts/release.sh minor --real       # bump, tag, release to real PyPI
+#   ./scripts/release.sh patch
+#   ./scripts/release.sh minor
 #   ./scripts/release.sh major
 #
 # Must be run from a clean, up-to-date `develop` checkout.
@@ -24,13 +24,8 @@ die()  { printf '\033[31m✗ %s\033[0m\n' "$1" >&2; exit 1; }
 BUMP="${1:-}"
 case "$BUMP" in
   patch|minor|major) ;;
-  *) die "Usage: $0 <patch|minor|major> [--real]  (default is a TestPyPI prerelease)" ;;
+  *) die "Usage: $0 <patch|minor|major>" ;;
 esac
-
-PRERELEASE=true
-if [ "${2:-}" = "--real" ]; then
-  PRERELEASE=false
-fi
 
 cd "$REPO_DIR"
 
@@ -60,13 +55,9 @@ git tag "$TAG"
 git push origin "$TAG"
 
 step "Creating the GitHub Release"
-FLAGS=(--title "$TAG" --generate-notes)
-if [ "$PRERELEASE" = true ]; then
-  FLAGS+=(--prerelease)
-fi
-gh release create "$TAG" "${FLAGS[@]}"
+gh release create "$TAG" --title "$TAG" --generate-notes
 
 step "Done"
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
-info "$TAG released — publish.yml is now building + publishing $([ "$PRERELEASE" = true ] && echo "to TestPyPI" || echo "to real PyPI")."
+info "$TAG released — publish.yml is now building + publishing to PyPI."
 info "Watch it: https://github.com/$REPO/actions/workflows/publish.yml"
