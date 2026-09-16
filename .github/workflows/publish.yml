@@ -13,23 +13,19 @@ name: Build, Attach & Publish Release
 # Verifies pyproject.toml's version at that exact commit matches the tag you
 # chose (a mismatch almost always means you forgot to bump the version before
 # tagging), then tests, builds the wheel + sdist, smoke-tests the BUILT wheel,
-# attaches both to the release you created, and publishes:
-#   - "Set as a pre-release" checked  -> TestPyPI (safe, repeatable dry run)
-#   - unchecked (a real release)      -> PyPI
+# attaches both to the release you created, and publishes to PyPI.
 #
-# Requires one-time setup on both index's side before this can succeed —
-# nothing here works until you do this by hand (PyPI Trusted Publishing has no
-# API for it):
-#   1. On test.pypi.org and pypi.org, under your account -> Publishing, add a
-#      "pending" trusted publisher for this project:
+# Requires one-time setup on PyPI's side before this can succeed — nothing
+# here works until you do this by hand (Trusted Publishing has no API for it):
+#   1. On pypi.org, under your account -> Publishing, add a "pending" trusted
+#      publisher for this project:
 #        - PyPI project name: appknox-mcp
 #        - Owner: appknox   Repository: appknox-mcp
 #        - Workflow filename: publish.yml
-#        - Environment name: testpypi (on test.pypi.org) / pypi (on pypi.org)
-#   2. In this repo's Settings -> Environments, create two environments named
-#      "testpypi" and "pypi" (the names must match what you registered above).
-#      Optionally add required reviewers to the "pypi" environment for a manual
-#      gate on real publishes.
+#        - Environment name: pypi
+#   2. In this repo's Settings -> Environments, create an environment named
+#      "pypi" (the name must match what you registered above). Optionally add
+#      required reviewers for a manual gate on every publish.
 # No secrets to create or store — Trusted Publishing uses this job's own OIDC
 # token (the `id-token: write` permission below), which is why the workflow
 # filename and environment name both have to match exactly what you registered.
@@ -41,13 +37,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     # Has to be resolved here, not inside a step — environment protection
-    # rules are evaluated before the job's steps run. github.event.release is
-    # available directly since this triggers on the release event itself —
-    # no separate lookup job needed (unlike when we reacted to a workflow_run).
-    environment: ${{ github.event.release.prerelease && 'testpypi' || 'pypi' }}
+    # rules are evaluated before the job's steps run.
+    environment: pypi
     permissions:
       contents: write # to attach the wheel/sdist to the release you created
-      id-token: write # PyPI/TestPyPI Trusted Publishing (OIDC)
+      id-token: write # PyPI Trusted Publishing (OIDC)
     env:
       # Dummy token so importing the server / running tests never blocks on
       # auth. Not a credential — the server accepts an empty/placeholder
@@ -94,20 +88,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.event.release.tag_name }}" dist/*.whl dist/*.tar.gz --clobber
 
-      - name: Publish to TestPyPI (prerelease dry run)
-        if: github.event.release.prerelease
-        run: uv publish --index testpypi
-
       - name: Publish to PyPI
-        if: ${{ !github.event.release.prerelease }}
         run: uv publish
 
       - name: Summary
         run: |
-          if [ "${{ github.event.release.prerelease }}" = "true" ]; then
-            echo "### Published to TestPyPI :test_tube:" >> "$GITHUB_STEP_SUMMARY"
-            echo "Verify with: \`uv tool install --reinstall --index https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --index-strategy unsafe-best-match appknox-mcp\`" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "### Published to PyPI :rocket:" >> "$GITHUB_STEP_SUMMARY"
-            echo "Verify with: \`uv tool install --reinstall appknox-mcp\`" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          echo "### Published to PyPI :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verify with: \`uv tool install --reinstall appknox-mcp\`" >> "$GITHUB_STEP_SUMMARY"

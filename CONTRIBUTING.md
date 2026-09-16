@@ -38,16 +38,15 @@ uv run pytest -q
 
 ```bash
 ./scripts/release.sh patch      # or minor / major
-./scripts/release.sh patch --real   # skip TestPyPI, publish straight to PyPI
 ```
 
 Bumps `pyproject.toml`'s version, pushes it straight to `develop`, tags it,
 and creates a GitHub Release using your own `gh` login — which is what
 triggers `.github/workflows/publish.yml` to actually build, test, and publish
-(TestPyPI by default, or real PyPI with `--real`). No PAT or stored secret
-involved: since it's your own account doing the push and creating the
-release, branch protection's admin exemption and GitHub's normal "a human did
-this" behavior both apply, exactly as if you'd done each step by hand.
+to PyPI. No PAT or stored secret involved: since it's your own account doing
+the push and creating the release, branch protection's admin exemption and
+GitHub's normal "a human did this" behavior both apply, exactly as if you'd
+done each step by hand.
 
 Must be run from a clean `develop` checkout, by an account with admin access
 to this repo (needed to push directly, bypassing the PR requirement above).
