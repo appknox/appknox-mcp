@@ -214,7 +214,7 @@ copy the **Access Key ID** and **Secret Access Token**. The token format is
 | Environment Variable | Required | Default | Description |
 |---|---|---|---|
 | `APPKNOX_ACCESS_TOKEN` | Yes | — | `<Access Key ID>:<Secret Access Key>` |
-| `APPKNOX_BASE_URL` | No | `https://publicapi.appknox.com` | API host (use staging while KnoxIQ is in beta) |
+| `APPKNOX_BASE_URL` | No | `https://publicapi.appknox.com` | Appknox Public API host |
 
 Per-client config file paths and shapes: [INSTALL.md](INSTALL.md#3-write-the-mcp-config-for-the-client).
 
