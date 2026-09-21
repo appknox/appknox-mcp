@@ -82,6 +82,26 @@ Prompt the user for three things (from Appknox dashboard → **Service Accounts*
    default: white-labeled deployments use a different host, so ask rather than
    guess (their dashboard has it if they're unsure).
 
+If the user doesn't already have these, share the steps below.
+
+**Getting an Access Key ID and Secret Access Key.** These come from a Service
+Account in Appknox, which must be created by a user with **Owner** privileges
+in the organization:
+
+1. Log in to Appknox and go to **Organization Settings**.
+2. Open the **Service Accounts** tab.
+3. Create a new service account and set its scope to at least:
+   - **Projects**: Read
+   - **Scan Results (VA)**: Read
+   - **Upload App**: Write
+4. Under **Project Access**, select **All Projects** (or the specific projects
+   the MCP should access).
+5. Generate the service account — Appknox provides an **Access Key ID** and
+   **Secret Access Key**. Use both here.
+
+If the user doesn't have Owner privileges, they'll need to ask an Owner in
+their organization to create the service account for them.
+
 Combine the first two into the token the server expects:
 `APPKNOX_ACCESS_TOKEN = "<Access Key ID>:<Secret Access Key>"` (a single colon
 between them). Hold these in memory for step 3 — never echo the secret back to
