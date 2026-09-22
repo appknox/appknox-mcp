@@ -146,7 +146,9 @@ def main() -> None:
             "CLI on PATH."
         ),
     )
-    parser.add_argument("--base-url", help="API base URL — required with --configure.")
+    parser.add_argument(
+        "--base-url", help="Appknox Public API base URL — required with --configure."
+    )
     args = parser.parse_args()
 
     if args.install_guide:

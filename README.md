@@ -211,10 +211,32 @@ Create a service account in the Appknox dashboard under **Service Accounts** and
 copy the **Access Key ID** and **Secret Access Token**. The token format is
 `<Access Key ID>:<Secret Access Key>`.
 
+### Getting your Access Key ID and Secret Access Key
+
+These credentials come from a Service Account in Appknox, which must be
+created by a user with **Owner** privileges in your organization.
+
+To create one:
+
+1. Log in to Appknox and go to **Organization Settings**.
+2. Open the **Service Accounts** tab.
+3. Create a new service account and set its scope to at least:
+   - **Projects**: Read
+   - **Scan Results (VA)**: Read
+   - **Upload App**: Write
+4. Under **Project Access**, select **All Projects** (or the specific projects
+   you want the MCP to access).
+5. Generate the service account — Appknox will provide an **Access Key ID**
+   and **Secret Access Key**. Copy both and use them when installing the
+   Appknox MCP.
+
+> **Note:** If you don't have Owner privileges, ask an Owner in your
+> organization to create the service account for you.
+
 | Environment Variable | Required | Default | Description |
 |---|---|---|---|
 | `APPKNOX_ACCESS_TOKEN` | Yes | — | `<Access Key ID>:<Secret Access Key>` |
-| `APPKNOX_BASE_URL` | No | `https://publicapi.appknox.com` | API host (use staging while KnoxIQ is in beta) |
+| `APPKNOX_BASE_URL` | No | `https://publicapi.appknox.com` | Appknox Public API host |
 
 Per-client config file paths and shapes: [INSTALL.md](INSTALL.md#3-write-the-mcp-config-for-the-client).
 

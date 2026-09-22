@@ -343,7 +343,9 @@ def main() -> None:
     parser.add_argument(
         "--repo", help="Absolute path to the MCP repo (run-from-source mode)."
     )
-    parser.add_argument("--base-url", help="API base URL (required unless --remove).")
+    parser.add_argument(
+        "--base-url", help="Appknox Public API base URL (required unless --remove)."
+    )
     parser.add_argument("--cwd", default=".", help="Dir for project-scoped configs.")
     parser.add_argument(
         "--tool",
