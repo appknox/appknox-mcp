@@ -20,6 +20,10 @@ You will be given: `file_id`, `analysis_id`, and that finding's `developer_promp
 
 Use Grep and Read to find the relevant code in this repository. `developer_prompt`/`remediation` often contain class names, method names, file references, or parameter names — use them as search anchors.
 
+**API-scan findings** have no class names: the anchor is the endpoint (`<METHOD> <URL>` from each finding's `description`) and the mechanism the remediation names. Your dispatch prompt includes the workflow's API-SCAN FINDINGS section and the backend repo path — follow it for locating the route, mapping the scanned host to this repo, and local verification. If you're in the app's repo with an API finding and no backend path, stop and report that instead of changing the app.
+
+**Intentionally vulnerable code** (test ranges, fixtures, CTF/training apps): your dispatch prompt includes the workflow's INTENTIONALLY VULNERABLE CODE section and whether the user already said to fix such cases. If they didn't, stop before editing and report what you found.
+
 ## 3. Apply a minimal, correct fix
 
 - Address the root cause, not just the specific instance in `poc`.
@@ -48,6 +52,7 @@ State clearly:
 - Whether the finding was fixed or not, and why if not.
 - Which file(s) you changed.
 - A one-line summary of the root cause and the fix applied.
-- PoC verification result: which steps you ran, their outcome, and which were left manual.
+- PoC verification result: which steps you ran, their outcome, and which were left manual. For API findings, include the positive control (a legitimate request still succeeds) and the local host:port you tested against.
+- Repo tests that now fail, split into ones your fix caused (e.g. tests that asserted the vulnerability) and ones that also fail on the unfixed code.
 
 Do **not** commit. The orchestrator decides whether to commit based on `commit` config; you only edit and report.
