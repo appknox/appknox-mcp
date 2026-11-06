@@ -11,6 +11,10 @@ server's instructions for exact comparison semantics (resolved / still_open /
 new_or_regressed, exploitability carried on still_open). This file adds only
 argument mapping and progress-line formatting.
 
+Not for API-scan fixes: those are confirmed by deploying the fixed backend and
+re-running the API scan on the Appknox platform. If the user asks to verify one,
+say that instead of running a comparison.
+
 Arguments (all optional):
 - `$1` — **new_file_id**: the re-scanned build (from `/appknox:upload`). Omitted
   -> resolve the repo's latest build (workflow's IDENTIFIER DETECTION).

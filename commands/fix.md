@@ -5,7 +5,9 @@ argument-hint: "<analysis_id | all | severity | exploitability-range> [file_id]"
 
 # Appknox Fix
 
-Run from inside the app's repository. Unlike `/appknox:triage` (which lists
+Run from inside the repository that holds the vulnerable code: the app's repo
+for Static/Dynamic findings, the backend's repo for API-scan findings (pass the
+`file_id` there, since the backend has no app identifier to detect). Unlike `/appknox:triage` (which lists
 everything and asks what to fix), this takes the selection **as an argument** and
 runs the workflow's FIX + VERIFY LOCALLY step straight away, leaving changes
 staged — see the `appknox` MCP server's instructions for the full workflow and
@@ -40,9 +42,23 @@ agents on the same file at once). Each sub-agent's prompt must include:
 `file_id`, `analysis_id`, that finding's `developer_prompt`/`remediation`/`poc`/
 vulnerability name/CWE, **and the workflow's step 5b (verify locally) text
 verbatim** — the sub-agent has no MCP connection and can't read it itself.
+For an API-scan finding, also pass the workflow's **API-SCAN FINDINGS** section
+verbatim, every `findings[]` entry's endpoint (`description`) and validation
+verdict, and the backend repo path. Pass the **INTENTIONALLY VULNERABLE CODE**
+section verbatim to every sub-agent, with whether the user has already said to
+fix intentional cases anyway.
+
+If the selection is API-scan findings and the current repo is the mobile app,
+don't dispatch: print `✗ #<id> is an API-scan finding — the fix belongs in the
+backend that serves <endpoint>` and ask for the backend repo, per the
+workflow's API-SCAN FINDINGS section.
 
 ## Report & hand off
 
 Summarise per finding: analysis id + name, root cause (one line), files changed,
 PoC result. Then follow the workflow's HAND OFF step — do not build, upload, or
 commit. Once rebuilt: `/appknox:upload <binary-path>` then `/appknox:verify`.
+API-only fixes skip upload and `/appknox:verify`: tell the user to deploy the
+fixed backend to the scanned host(s) and run the API scan again on the Appknox
+platform, and list the repo tests that now fail because they asserted the old
+behaviour.

@@ -49,6 +49,21 @@ _EXPLOITABILITY_LIKELIHOOD_DISPLAY = {
 }
 
 
+def _scan_type_labels(analysis: Analysis) -> set[str]:
+    """Lower-cased scan-type labels for an analysis ("static", "dynamic", "api", ...).
+
+    The API sends ``vulnerability_scan_types`` as a list of
+    ``{"scan_type": 4, "scan_type_display": "API"}`` objects; bare strings are
+    accepted too so a shape change degrades to "still filterable", not a crash.
+    """
+    labels = set()
+    for entry in analysis.vulnerability_scan_types:
+        label = entry.get("scan_type_display") if isinstance(entry, dict) else entry
+        if isinstance(label, str):
+            labels.add(label.strip().lower())
+    return labels
+
+
 def _to_row(analysis: Analysis, include_exploitability: bool) -> dict[str, Any]:
     """Build a flat, display-ready row for one analysis."""
     likelihood = (
@@ -78,6 +93,7 @@ async def list_analyses(
     min_risk: int | None = None,
     min_exploitability: float | None = None,
     include_exploitability: bool = True,
+    scan_type: str | None = None,
 ) -> list[dict[str, Any]]:
     """List all vulnerability analyses for a file (one row per analysis).
 
@@ -96,8 +112,18 @@ async def list_analyses(
     `exploitability_likelihood` from the response (e.g. for a compact risk-only
     browse of a file with many analyses) — leave it at the default otherwise,
     since exploitability is what makes the sort order meaningful.
+
+    `scan_type` keeps only analyses tested by that scan type — matched
+    case-insensitively against each row's `scan_type_display` ("Static",
+    "Dynamic", "API", "Manual"). Use `scan_type="API"` when the user asks for
+    API-scan findings: those are fixed in the backend that serves the app's
+    requests, usually a different repo from the app (see the server
+    instructions' API-SCAN FINDINGS section).
     """
     analyses = await client.list_analyses(file_id)
+    if scan_type is not None:
+        wanted = scan_type.strip().lower()
+        analyses = [a for a in analyses if wanted in _scan_type_labels(a)]
     if min_risk is not None:
         analyses = [
             a

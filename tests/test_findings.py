@@ -243,6 +243,48 @@ async def test_include_exploitability_false_drops_fields(fake_client) -> None:
     assert rows[0]["exploitability_likelihood"] is None
 
 
+def _with_scan_types(analysis: dict[str, Any], *labels: str) -> dict[str, Any]:
+    """Give an analysis payload the API's real scan-type shape."""
+    codes = {"Static": 1, "Dynamic": 2, "Manual": 3, "API": 4}
+    analysis["vulnerability_scan_types"] = [
+        {"scan_type": codes[label], "scan_type_display": label} for label in labels
+    ]
+    return analysis
+
+
+async def test_scan_type_filter_keeps_only_matching_analyses(fake_client) -> None:
+    fake_client(
+        analyses={
+            1: [
+                _with_scan_types(_analysis(1, 3, exploitability_score=10), "API"),
+                _with_scan_types(_analysis(2, 4, exploitability_score=4), "Static"),
+                _with_scan_types(
+                    _analysis(3, 3, exploitability_score=4), "Static", "Dynamic"
+                ),
+            ]
+        }
+    )
+
+    api_rows = await findings.list_analyses(file_id=1, scan_type="api")
+    dynamic_rows = await findings.list_analyses(file_id=1, scan_type="Dynamic")
+
+    # Case-insensitive on scan_type_display, and an analysis tested by several
+    # scan types matches any of them.
+    assert [r["id"] for r in api_rows] == [1]
+    assert [r["id"] for r in dynamic_rows] == [3]
+
+
+async def test_scan_type_filter_accepts_plain_string_entries(fake_client) -> None:
+    fake_client(analyses={1: [_analysis(1, 4), _analysis(2, 4)]})
+
+    # _analysis() uses bare strings (["SAST"]); those must stay filterable.
+    rows = await findings.list_analyses(file_id=1, scan_type="sast")
+    none = await findings.list_analyses(file_id=1, scan_type="API")
+
+    assert sorted(r["id"] for r in rows) == [1, 2]
+    assert none == []
+
+
 async def test_previous_file_id_returns_prior_build(fake_client) -> None:
     fake_client(
         files={9: _file(id=9, project_id=3)},
