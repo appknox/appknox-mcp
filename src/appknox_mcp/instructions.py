@@ -120,10 +120,12 @@ results and errors than the tool it was supposed to replace.
 6. HAND OFF. Do NOT commit and do NOT build — leave the fixes staged. Tell the
    user: "Fixes applied. Ready to upload the rebuilt binary to Appknox for
    re-scan, or need help building it?" Wait for their go-ahead.
-   API-only fixes need no app rebuild, but the scanner can only see them once
-   the fixed backend is deployed to the host it tested — say which host(s),
-   don't deploy it yourself, and say which tests in that repo now fail because
-   they asserted the old behaviour.
+   API-only fixes are different: there is no binary to rebuild or upload, and
+   nothing more you can do from here. Hand off with: "Fixes applied locally.
+   To confirm them, deploy the fixed backend to <scanned host(s)>, then run the
+   API scan again for this app on the Appknox platform." Don't deploy it
+   yourself. Also say which tests in that repo now fail because they asserted
+   the old behaviour. Skip step 7 for these.
 
 7. RE-SCAN (ground truth). When confirmed, upload_binary(path) -> new file_id.
    Poll knoxiq_get_scan_status until ready, then knoxiq_verify_fixes(new_file_id) —
@@ -131,10 +133,10 @@ results and errors than the tool it was supposed to replace.
    old_file_id=... to scope it. Reports resolved vs still_open (still_open carries
    the new build's exploitability, so a partial improvement is visible even when a
    finding hasn't fully cleared) vs new_or_regressed; findings match across builds
-   by vulnerability_id. For API-only fixes, re-scan only after the backend is
-   redeployed; an unchanged app binary can be uploaded again to get a new
-   file_id. A re-scan run before the deploy re-tests the old code and will show
-   the finding as still open.
+   by vulnerability_id. Not for API-only fixes: those are confirmed by the
+   user re-running the API scan on the Appknox platform after deploying the
+   backend (see step 6) — don't call upload_binary or knoxiq_verify_fixes for
+   them.
 
 Note: signing-scheme findings (e.g. Janus / CVE-2017-13156) are fixed at signing
 time, not by source edits.
@@ -178,6 +180,9 @@ that answers those requests, which is usually a different repo from the app.
   against the unfixed code (e.g. git show HEAD:<file> into a temp dir) to tell
   failures your fix caused from ones that already fail in this environment;
   report both. Stop the services you started.
+- Hand off: the local check is all you can verify. The scanned host keeps
+  running the old code until the user deploys the fix, and only the API scan
+  re-run on the Appknox platform confirms it — tell the user both (step 6).
 
 INTENTIONALLY VULNERABLE CODE — security test ranges, scanner fixtures, CTF
 targets and training apps are vulnerable on purpose. Signs: a comment or

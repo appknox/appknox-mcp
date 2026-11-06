@@ -68,3 +68,5 @@ Print a summary including each fixer's PoC result:
 ```
 Then follow the workflow's HAND OFF step. Point to `/appknox:upload` and
 `/appknox:verify` for the re-scan steps — do not build, upload, or commit here.
+For API-only fixes, point instead to deploying the backend and re-running the
+API scan on the Appknox platform.

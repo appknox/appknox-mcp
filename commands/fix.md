@@ -58,6 +58,7 @@ workflow's API-SCAN FINDINGS section.
 Summarise per finding: analysis id + name, root cause (one line), files changed,
 PoC result. Then follow the workflow's HAND OFF step — do not build, upload, or
 commit. Once rebuilt: `/appknox:upload <binary-path>` then `/appknox:verify`.
-For API-only fixes there's nothing to rebuild: name the host(s) the fixed
-backend must be redeployed to, and list the repo tests that now fail because
-they asserted the old behaviour; re-scan only after that deploy.
+API-only fixes skip upload and `/appknox:verify`: tell the user to deploy the
+fixed backend to the scanned host(s) and run the API scan again on the Appknox
+platform, and list the repo tests that now fail because they asserted the old
+behaviour.
