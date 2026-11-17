@@ -23,6 +23,13 @@ def test_workflow_instructions_present():
     assert "fix-and-verify" in WORKFLOW_INSTRUCTIONS.lower()
 
 
+def test_workflow_instructions_cover_api_and_intentional_findings():
+    # The fix/triage commands and the appknox-fixer agent tell callers to pass
+    # these sections verbatim, so they must exist under these exact headings.
+    assert "API-SCAN FINDINGS" in WORKFLOW_INSTRUCTIONS
+    assert "INTENTIONALLY VULNERABLE CODE" in WORKFLOW_INSTRUCTIONS
+
+
 def test_install_guide_prints_install_md(capsys):
     server._print_install_guide()
     out = capsys.readouterr().out
