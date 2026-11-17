@@ -18,6 +18,10 @@ Arguments (all optional), mapped onto the workflow:
   auto-detect from the repo and use the latest scanned build.
 - `$2` — feeds step 3 (TRIAGE): **min_risk** floor (`-1` Unknown … `4` Critical).
   Default **1** (Low and above), so Passed/Untested are hidden.
+- A scan-type word anywhere in the arguments (`api`, `static`, `dynamic`,
+  `manual`) is passed as `list_analyses(scan_type=...)`, e.g.
+  `/appknox:triage 40 api`. API-scan findings are fixed in the backend repo,
+  so run this from there with a `file_id` (see the workflow's API-SCAN FINDINGS).
 
 Print each step's status line **exactly** as shown (a leading `⏳` while working,
 `✓` on success, `✗` on failure) so the run reads as a clear progress log — this
@@ -43,6 +47,11 @@ finding — pass it `file_id`, `analysis_id`, that finding's `developer_prompt`,
 `remediation`, `poc`, vulnerability name, CWE, **and the workflow's step 5b
 (verify locally) text verbatim** (the sub-agent has no MCP connection and can't
 read it itself); it fixes and PoC-verifies per that text, then reports back.
+Also pass the workflow's **INTENTIONALLY VULNERABLE CODE** section verbatim to
+every fixer, and for API-scan findings the **API-SCAN FINDINGS** section
+verbatim plus each `findings[]` endpoint, its validation verdict, and the
+backend repo path. API findings selected from the app's repo: don't dispatch —
+ask for the backend repo first.
 Findings sharing a file: dispatch **sequentially**. Findings whose files don't
 overlap: dispatch **concurrently**, grouped so no two agents ever touch the same
 file. Print `⚙ Fixing <k> finding(s) <sequentially|in parallel>…`.
@@ -59,3 +68,5 @@ Print a summary including each fixer's PoC result:
 ```
 Then follow the workflow's HAND OFF step. Point to `/appknox:upload` and
 `/appknox:verify` for the re-scan steps — do not build, upload, or commit here.
+For API-only fixes, point instead to deploying the backend and re-running the
+API scan on the Appknox platform.
