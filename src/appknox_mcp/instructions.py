@@ -115,3 +115,31 @@ sets the platform:
 - Native iOS: PRODUCT_BUNDLE_IDENTIFIER in *.xcodeproj, else CFBundleIdentifier.
 - Both platforms present: identifiers may differ — ask which to triage.
 """
+
+
+# Remote (hosted connector) mode sends only this neutral summary as the
+# server's instructions. Connector directories (Claude's connector review,
+# Google Connected Apps policy) reject servers that steer the model or set
+# rules across tools, so the workflow above reaches remote users only when
+# they ask for it, through the user-invoked prompts in prompts.py.
+SERVER_SUMMARY = """\
+Appknox KnoxIQ: read the vulnerabilities Appknox found in a mobile app build, \
+with KnoxIQ exploitability, remediation guidance and proof-of-concept \
+verification steps; upload rebuilt binaries for scanning; and compare a \
+re-scan with the previous build. Guided workflows are available as the \
+prompts `triage`, `fix` and `verify`."""
+
+_REMOTE_UPLOAD = (
+    "upload_start -> PUT the binary to the returned presigned URL with its "
+    "put_command -> upload_complete(upload_key, upload_key_signed)"
+)
+
+
+def workflow_text(remote: bool) -> str:
+    """The workflow, with the upload step matching the server's mode: remote
+    servers can't read local files, so upload is split around the PUT."""
+    if not remote:
+        return WORKFLOW_INSTRUCTIONS
+    return WORKFLOW_INSTRUCTIONS.replace("upload_binary(path)", _REMOTE_UPLOAD).replace(
+        "upload_binary.", "upload_start, upload_complete."
+    )

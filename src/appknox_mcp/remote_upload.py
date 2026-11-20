@@ -40,12 +40,12 @@ def _put_commands(url: str) -> dict[str, str]:
 
 @mcp.tool(title="Start build upload", annotations=_UPLOAD_STEP)
 async def upload_start() -> dict[str, Any]:
-    """Step 1 of 3 to upload an app binary (APK/IPA) to Appknox from a remote server.
+    """Create a one-time presigned URL for uploading an app binary.
 
-    Returns a short-lived presigned storage URL plus ``upload_key`` and
-    ``upload_key_signed``. Step 2 is to PUT the local binary to that URL with
-    the returned ``put_command`` (replace ``<path-to-binary>``); step 3 is
-    ``upload_complete`` with the two keys. The URL accepts only this one upload.
+    For servers that cannot read the caller's files. Returns ``presigned_url``,
+    ``upload_key``, ``upload_key_signed`` and ``put_command`` (an HTTP PUT of a
+    local file to that URL, for macOS/Linux and for Windows). Nothing is
+    scanned until the upload is confirmed with the two keys.
     """
     handshake = await upload._request_upload_url()
     return {
@@ -54,12 +54,6 @@ async def upload_start() -> dict[str, Any]:
         "presigned_url": handshake["url"],
         "expires_in_seconds_hint": _URL_TTL_HINT_SECONDS,
         "put_command": _put_commands(handshake["url"]),
-        "next_step": (
-            "Run put_command for your OS from the repo, with <path-to-binary> "
-            "replaced by the built APK/IPA path and the URL unchanged. It must "
-            "exit 0. Then call upload_complete(upload_key, upload_key_signed). "
-            "If the PUT fails or the URL has expired, call upload_start again."
-        ),
     }
 
 
@@ -70,13 +64,13 @@ async def upload_complete(
     wait_for_file_id: bool = True,
     timeout_seconds: int = 300,
 ) -> dict[str, Any]:
-    """Step 3 of 3: confirm an upload started with ``upload_start`` and start its scan.
+    """Confirm an upload made to a presigned URL and start the scan.
 
-    Call only after the PUT from step 2 exited successfully. Creates the
-    submission (Appknox validates the binary, then scans it) and, when
-    ``wait_for_file_id`` is true, waits until Appknox assigns the build a
-    ``file_id``. If Appknox can't find the uploaded object, the error says so —
-    re-run the PUT, or start over with ``upload_start``.
+    Takes the ``upload_key`` and ``upload_key_signed`` issued with the URL.
+    Creates the submission (Appknox validates the binary, then scans it) and,
+    with ``wait_for_file_id`` (default true), waits until the new build has a
+    ``file_id``. Returns an error when the uploaded file can't be found or the
+    URL has expired.
     """
     submission_id = await upload._create_submission(upload_key, upload_key_signed)
     result: dict[str, Any] = {"submission_id": submission_id}

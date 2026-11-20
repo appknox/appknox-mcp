@@ -8,13 +8,14 @@ from pathlib import Path
 # Tool modules register their @mcp.tool tools on import.
 from appknox_mcp import (  # noqa: F401
     findings,
+    prompts,
     resolve,
     status,
     upload,
     verify,
 )
 from appknox_mcp.app import access_token, mcp
-from appknox_mcp.instructions import WORKFLOW_INSTRUCTIONS
+from appknox_mcp.instructions import SERVER_SUMMARY
 
 
 def _print_install_guide() -> None:
@@ -124,13 +125,16 @@ def _run_remote(host: str | None, port: int | None, public_url: str | None) -> N
     config = remote.RemoteConfig.from_env(host=host, port=port, public_url=public_url)
     mcp.auth = remote.build_auth(config)
     app_module.client.enable_remote(config.api_base_url)
-    mcp.remove_tool("upload_binary")
-    mcp.instructions = (
-        WORKFLOW_INSTRUCTIONS.replace(
-            "upload_binary(path)", "upload_start -> PUT the file -> upload_complete"
-        ).replace("upload_binary.", "upload_start, upload_complete.")
-        + remote.REMOTE_UPLOAD_NOTE
-    )
+    _remove_tool("upload_binary")
+    if not config.upload_tools:
+        # e.g. Google Connected Apps: the client can't read files or run a
+        # PUT, so the split upload can't work there.
+        _remove_tool("upload_start")
+        _remove_tool("upload_complete")
+    # Connector directories reject servers that steer the model; remote mode
+    # sends a neutral summary and offers the workflow as prompts instead.
+    mcp.instructions = SERVER_SUMMARY
+    prompts.set_remote_mode(True)
     _add_health_route()
     mcp.run(
         transport="http",
@@ -142,6 +146,16 @@ def _run_remote(host: str | None, port: int | None, public_url: str | None) -> N
         allowed_hosts=config.allowed_hosts(),
         show_banner=False,
     )
+
+
+def _remove_tool(name: str) -> None:
+    """FastMCP 3 moved tool removal to the local provider; 2.x (still allowed
+    by pyproject) only has ``FastMCP.remove_tool``."""
+    provider = getattr(mcp, "local_provider", None)
+    if provider is not None:
+        provider.remove_tool(name)
+    else:
+        mcp.remove_tool(name)
 
 
 def _add_health_route() -> None:
