@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "appknox": {
+      "command": "uvx",
+      "args": [
+        "appknox-mcp==1.0.2"
+      ],
+      "env": {
+        "APPKNOX_ACCESS_TOKEN": "${user_config.access_token}",
+        "APPKNOX_BASE_URL": "${user_config.base_url}"
+      }
+    }
+  }
+}

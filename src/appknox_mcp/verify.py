@@ -8,7 +8,7 @@ Vulnerabilities are matched across builds by ``vulnerability_id`` (stable), not 
 from typing import Any
 
 from appknox_mcp import findings, status
-from appknox_mcp.app import mcp
+from appknox_mcp.app import READ_ONLY, mcp
 
 
 def _open_vuln_index(rows: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
@@ -83,7 +83,7 @@ def _split_targets(
     return resolved, still_open
 
 
-@mcp.tool
+@mcp.tool(title="Verify fixes on re-scan", annotations=READ_ONLY)
 async def knoxiq_verify_fixes(
     new_file_id: int,
     vulnerability_ids: list[int] | None = None,
