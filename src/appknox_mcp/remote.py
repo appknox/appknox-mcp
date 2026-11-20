@@ -46,13 +46,6 @@ log = logging.getLogger("appknox_mcp.remote")
 
 SCOPE_READ = "mcp:read"
 SCOPE_UPLOAD = "mcp:upload"
-REMOTE_UPLOAD_NOTE = """
-
-REMOTE SERVER: this server cannot read your files. To upload a build, call
-upload_start, run the put_command it returns locally (the one sanctioned
-direct HTTP call: it sends the binary straight to Appknox storage), then call
-upload_complete with the returned keys."""
-
 # Path of mycroft's OAuth issuer under the API host.
 ISSUER_PATH = "/api/v2/oidc"
 
@@ -71,6 +64,9 @@ class RemoteConfig:
     # serve any request (no sticky sessions). Every tool call here is
     # self-contained, so nothing is lost.
     stateless: bool = True
+    # Off for clients that can neither read local files nor run a PUT (e.g.
+    # Google Connected Apps): drops upload_start/upload_complete.
+    upload_tools: bool = True
 
     @property
     def public_host(self) -> str:
@@ -107,13 +103,20 @@ class RemoteConfig:
             issuer_url=issuer.rstrip("/"),
             host=host or os.environ.get("APPKNOX_MCP_HOST", "127.0.0.1"),
             port=port or int(os.environ.get("APPKNOX_MCP_PORT", "8000")),
-            stateless=os.environ.get("APPKNOX_MCP_STATELESS", "true").lower()
-            not in {"0", "false", "no"},
+            stateless=_env_flag("APPKNOX_MCP_STATELESS", True),
+            upload_tools=_env_flag("APPKNOX_MCP_UPLOAD_TOOLS", True),
         )
 
     def allowed_hosts(self) -> list[str]:
         extra = os.environ.get("APPKNOX_MCP_ALLOWED_HOSTS", "")
         return [self.public_host, *(h.strip() for h in extra.split(",") if h.strip())]
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _token_key(token: str) -> str:
