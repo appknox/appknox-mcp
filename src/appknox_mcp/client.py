@@ -39,8 +39,21 @@ def _ensure_https(url: str) -> str:
     here, silently, avoids a whole class of confusing 301/308 failures
     instead of surfacing an error for a human or LLM to puzzle over and
     manually correct.
+
+    The one exception is an explicit ``http://`` URL for the developer's own
+    machine (localhost, 127.0.0.1, [::1], host.docker.internal) — only ever a
+    local mycroft, which serves plain HTTP.
     """
     if url.startswith("https://"):
+        return url
+    if url.startswith("http://") and urlparse(url).hostname in {
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        # Docker Desktop's name for the host machine: a local mycroft seen
+        # from inside the appknox-mcp container.
+        "host.docker.internal",
+    }:
         return url
     _, sep, rest = url.partition("://")
     return f"https://{rest if sep else url}"

@@ -14,6 +14,7 @@ from appknox_mcp import (  # noqa: F401
     verify,
 )
 from appknox_mcp.app import access_token, mcp
+from appknox_mcp.instructions import WORKFLOW_INSTRUCTIONS
 
 
 def _print_install_guide() -> None:
@@ -110,6 +111,50 @@ def _configure_client(client: str, base_url: str) -> None:
     configure.configure_client(client, configure.require_token(), base_url)
 
 
+def _run_remote(host: str | None, port: int | None, public_url: str | None) -> None:
+    """Serve over Streamable HTTP with per-user OAuth (see remote.py).
+
+    Swaps stdio-only pieces for their remote equivalents: OAuth auth on the
+    server, the request-scoped client in OAuth mode, and the 3-step upload
+    tools in place of ``upload_binary`` (which needs the caller's disk).
+    """
+    from appknox_mcp import app as app_module
+    from appknox_mcp import remote, remote_upload  # noqa: F401  (registers tools)
+
+    config = remote.RemoteConfig.from_env(host=host, port=port, public_url=public_url)
+    mcp.auth = remote.build_auth(config)
+    app_module.client.enable_remote(config.api_base_url)
+    mcp.remove_tool("upload_binary")
+    mcp.instructions = (
+        WORKFLOW_INSTRUCTIONS.replace(
+            "upload_binary(path)", "upload_start -> PUT the file -> upload_complete"
+        ).replace("upload_binary.", "upload_start, upload_complete.")
+        + remote.REMOTE_UPLOAD_NOTE
+    )
+    _add_health_route()
+    mcp.run(
+        transport="http",
+        host=config.host,
+        port=config.port,
+        path=config.path,
+        stateless_http=config.stateless,
+        host_origin_protection=True,
+        allowed_hosts=config.allowed_hosts(),
+        show_banner=False,
+    )
+
+
+def _add_health_route() -> None:
+    """Unauthenticated liveness probe for the load balancer / k8s — reports
+    only that the process serves HTTP, nothing about users or Appknox."""
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse
+
+    @mcp.custom_route("/healthz", methods=["GET"])
+    async def healthz(_: Request) -> JSONResponse:
+        return JSONResponse({"status": "ok"})
+
+
 def main() -> None:
     """Run the stdio MCP server.
 
@@ -149,6 +194,21 @@ def main() -> None:
     parser.add_argument(
         "--base-url", help="Appknox Public API base URL — required with --configure."
     )
+    parser.add_argument(
+        "--http",
+        action="store_true",
+        help=(
+            "Run as a remote, multi-user server over Streamable HTTP with OAuth "
+            "(each request acts as its own Appknox user). Needs "
+            "APPKNOX_API_BASE_URL and APPKNOX_MCP_PUBLIC_URL; see remote.py."
+        ),
+    )
+    parser.add_argument("--host", help="Bind address for --http (default 127.0.0.1).")
+    parser.add_argument("--port", type=int, help="Port for --http (default 8000).")
+    parser.add_argument(
+        "--public-url",
+        help="Public base URL clients use to reach this server (--http).",
+    )
     args = parser.parse_args()
 
     if args.install_guide:
@@ -166,6 +226,10 @@ def main() -> None:
         from appknox_mcp import configure
 
         configure.remove_client(args.remove_client)
+        return
+
+    if args.http:
+        _run_remote(args.host, args.port, args.public_url)
         return
 
     if not access_token:

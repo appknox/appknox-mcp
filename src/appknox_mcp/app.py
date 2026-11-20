@@ -12,11 +12,15 @@ from fastmcp import FastMCP
 
 from appknox_mcp.client import AppknoxClient
 from appknox_mcp.instructions import WORKFLOW_INSTRUCTIONS
+from appknox_mcp.remote import RequestScopedClient
 
 access_token = os.environ.get("APPKNOX_ACCESS_TOKEN", "")
 base_url = os.environ.get("APPKNOX_BASE_URL", "") or "https://publicapi.appknox.com"
 
-client = AppknoxClient(base_url, access_token)
+# Tools call this exactly the same way in both modes. In stdio mode it is the
+# service-account Public API client; in remote mode (server.main --http) it
+# resolves per request to the calling user's OAuth client (see remote.py).
+client = RequestScopedClient(AppknoxClient(base_url, access_token), api_base_url=None)
 mcp = FastMCP(name="Appknox KnoxIQ", instructions=WORKFLOW_INSTRUCTIONS)
 
 # MCP tool annotations (ToolAnnotations hints). Directory listings (Claude's
