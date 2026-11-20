@@ -181,14 +181,14 @@ ensure_gitignored() {
 }
 
 # Claude Code also gets this as a plugin (marketplace-installed at user scope):
-# the plugin adds the /appknox:<name> slash commands + fixer agent — it does
-# NOT provide the working MCP connection with real credentials (its own
-# bundled .mcp.json reads $APPKNOX_ACCESS_TOKEN/$APPKNOX_BASE_URL from the
-# environment, since that file is shared plugin code, not a personal config).
-# The actual credentialed connection is the `claude mcp add --scope user` call
-# above (configure_mcp.py's "claude" client) — this just adds the commands on
-# top of it. Commands are namespaced /appknox:<name> — the plugin system
-# always prefixes <plugin>:<command>, no opt-out.
+# the plugin adds the /appknox:<name> slash commands + fixer agent, and its own
+# pinned MCP entry (`uvx appknox-mcp==<version>`). That entry takes its token
+# from the plugin's userConfig — Claude Code prompts for it when the plugin is
+# enabled and keeps it in the OS credential store — so it never reads this
+# shell's environment. The `claude mcp add --scope user` call above
+# (configure_mcp.py's "claude" client) remains the connection for non-plugin
+# use. Commands are namespaced /appknox:<name> — the plugin system always
+# prefixes <plugin>:<command>, no opt-out.
 install_claude_plugin() {
   if ! command -v claude >/dev/null 2>&1; then
     warn "claude CLI not found — skipping plugin install (commands/agent won't be available)."
@@ -197,9 +197,8 @@ install_claude_plugin() {
   claude plugin marketplace add "$REPO_DIR" --scope user >/dev/null
   claude plugin install appknox@appknox -y >/dev/null
   info "✓ Installed the appknox plugin (slash commands + fixer agent, user scope)"
-  warn "The plugin's OWN MCP entry (separate from the one just registered above)"
-  warn "reads \$APPKNOX_ACCESS_TOKEN/\$APPKNOX_BASE_URL from your shell at launch —"
-  warn "export them in your shell profile if /appknox:* commands need it too."
+  info "→ Claude Code will ask for the plugin's Appknox token when it next starts"
+  info "  (stored in your OS credential store; separate from the entry above)."
 }
 
 for CLIENT in "${SELECTED[@]}"; do

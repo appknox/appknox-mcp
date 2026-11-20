@@ -1,0 +1,40 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.appknox/appknox-mcp",
+  "title": "Appknox KnoxIQ",
+  "description": "Fix and verify mobile app vulnerabilities found by Appknox KnoxIQ, from your coding agent.",
+  "repository": {
+    "url": "https://github.com/appknox/appknox-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://www.appknox.com",
+  "version": "1.0.2",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "appknox-mcp",
+      "version": "1.0.2",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "APPKNOX_ACCESS_TOKEN",
+          "description": "Appknox service-account credential: <Access Key ID>:<Secret>",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "APPKNOX_BASE_URL",
+          "description": "Appknox Public API base URL (only for dedicated/on-prem instances)",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string",
+          "default": "https://publicapi.appknox.com"
+        }
+      ]
+    }
+  ]
+}

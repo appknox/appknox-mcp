@@ -10,7 +10,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from appknox_mcp.app import client, mcp
+from appknox_mcp.app import STARTS_SCAN, client, mcp
 from appknox_mcp.client import AppknoxAPIError
 
 
@@ -64,7 +64,7 @@ async def _await_file_id(
         waited += interval
 
 
-@mcp.tool
+@mcp.tool(title="Upload build and start scan", annotations=STARTS_SCAN)
 async def upload_binary(
     file_path: str, wait_for_file_id: bool = True, timeout_seconds: int = 300
 ) -> dict[str, Any]:
