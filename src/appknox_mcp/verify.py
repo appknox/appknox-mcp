@@ -90,20 +90,17 @@ async def knoxiq_verify_fixes(
     old_file_id: int | None = None,
     min_risk: int = 1,
 ) -> dict[str, Any]:
-    """Confirm fixes landed by checking a re-scanned build for the vulnerabilities you fixed.
+    """Report which vulnerabilities a re-scanned build resolved.
 
-    Run this after re-uploading a fixed build (see ``upload_binary``) once its scan
-    completes. Pass ``new_file_id`` (the re-scanned build); by default it compares
-    against the **previous build** in the same project. To scope it instead, pass
-    EITHER the ``vulnerability_ids`` you fixed OR an explicit ``old_file_id``. A
-    vulnerability counts as resolved when it is no longer open (risk >= ``min_risk``)
-    in the new build; findings are matched across builds by ``vulnerability_id``. If
-    the new build's scan/KnoxIQ has not completed yet this returns ``ready: false``
-    with a message instead of a premature "all fixed". When comparing against an old
-    build, ``new_or_regressed`` lists vulns open in the new build that were not open
-    before. ``still_open`` entries carry the new build's ``exploitability_score``/
-    ``exploitability_likelihood``, so a fix that lowered exploitability without
-    fully resolving the finding is visible instead of reading as a no-op.
+    ``new_file_id`` is the re-scanned build. It is compared with the previous
+    build of the same project, or with ``old_file_id`` when given;
+    ``vulnerability_ids`` limits the comparison to those vulnerabilities. A
+    vulnerability is resolved when it is no longer open (risk at or above
+    ``min_risk``) in the new build; builds are matched by ``vulnerability_id``.
+    Returns ``resolved``, ``still_open`` (with the new build's exploitability)
+    and, against a baseline build, ``new_or_regressed``. Returns ``ready: false``
+    with a ``message`` while the new build's scan or KnoxIQ analysis is
+    unfinished.
     """
     scan_status = await status.knoxiq_get_scan_status(new_file_id)
     if not scan_status["ready"]:

@@ -4,17 +4,21 @@ import asyncio
 from typing import Any
 
 from appknox_mcp.app import READ_ONLY, client, mcp
+from appknox_mcp.client import AppknoxAPIError
 from appknox_mcp.models import Analysis
+
+# Each finding carries remediation text and PoC steps; keep one response at a
+# size directories accept (Claude's connector review: "reasonably sized").
+MAX_FIX_PLAN_IDS = 10
 
 
 @mcp.tool(title="Get build info", annotations=READ_ONLY)
 async def get_file_info(file_id: int) -> dict[str, Any]:
-    """Fetch a file's identity and scan summary (package_name, version, platform, risk counts).
+    """Return a build's identity and scan summary.
 
-    Use this to identify the app behind a ``file_id`` and, for post-fix
-    verification, to confirm a re-uploaded build is the same app — matching
-    ``package_name`` and ``platform`` — before comparing analyses across the
-    two files. Fields not relevant to triage are dropped from the response.
+    Includes package name, version, platform, project, SAST/DAST scan status,
+    KnoxIQ status and risk counts by severity. Fields unrelated to
+    vulnerability triage are omitted.
     """
     file = await client.get_file(file_id)
     return file.model_dump()
@@ -79,23 +83,18 @@ async def list_analyses(
     min_exploitability: float | None = None,
     include_exploitability: bool = True,
 ) -> list[dict[str, Any]]:
-    """List all vulnerability analyses for a file (one row per analysis).
+    """List the vulnerability analyses of a build, one row per analysis.
 
-    This is the generic analyses list (the `/files/{id}/analyses` endpoint). For
-    KnoxIQ-enabled orgs it already carries each analysis's highest KnoxIQ
-    `exploitability` — every filter below works off that single call, no
-    per-analysis fetches.
+    Rows are sorted by KnoxIQ ``exploitability_score`` (highest first), then by
+    severity. Each row has severity (``computed_risk``, ``computed_risk_display``),
+    CVSS and CWE, and for KnoxIQ-enabled organizations ``exploitability_score``
+    and ``exploitability_likelihood`` (Unknown, Passed, Low, Medium, High).
 
-    Always sorted exploitability-first, severity as tiebreak (KnoxIQ's signal
-    for what to fix first) — present rows in this order, don't re-sort by id.
-
-    `min_risk` filters on `computed_risk` (-1 Unknown, 0 Passed, 1 Low, 2 Medium,
-    3 High, 4 Critical). `min_exploitability` filters on `exploitability_score`
-    (the highest KnoxIQ exploitability score among an analysis's findings). Set
-    `include_exploitability=False` to drop `exploitability_score`/
-    `exploitability_likelihood` from the response (e.g. for a compact risk-only
-    browse of a file with many analyses) — leave it at the default otherwise,
-    since exploitability is what makes the sort order meaningful.
+    ``min_risk`` keeps rows whose ``computed_risk`` is at or above the value
+    (-1 Unknown, 0 Passed, 1 Low, 2 Medium, 3 High, 4 Critical).
+    ``min_exploitability`` keeps rows whose ``exploitability_score`` is at or
+    above the value. ``include_exploitability=false`` omits the two
+    exploitability fields.
     """
     analyses = await client.list_analyses(file_id)
     if min_risk is not None:
@@ -125,14 +124,12 @@ async def list_analyses(
 
 @mcp.tool(title="Prepare one fix", annotations=READ_ONLY)
 async def knoxiq_prepare_fix(file_id: int, analysis_id: int) -> dict[str, Any]:
-    """Gather everything needed to fix ONE vulnerability, in a single call.
+    """Return KnoxIQ's fix data for one vulnerability analysis of a build.
 
-    This is the portable equivalent of the ``/appknox:fix`` slash command for
-    non-Claude clients: give it the ``file_id`` and the ``analysis_id`` the user
-    wants fixed and it returns that finding's full fix payload — ``developer_prompt``
-    (the primary instruction), ``remediation``, ``poc`` (whose ``verification_steps``
-    you run after the fix to confirm it), and ``exploitability``. Apply the fix,
-    then run the PoC steps to confirm it before rebuilding.
+    Each finding in the response has ``developer_prompt`` (KnoxIQ's remediation
+    guidance for this code base, written for a coding assistant),
+    ``remediation``, ``poc`` (verification steps, and the evidence a still
+    vulnerable build shows) and ``exploitability``.
     """
     findings = await client.list_knoxiq_findings(file_id, analysis_id)
     return {
@@ -146,11 +143,19 @@ async def knoxiq_prepare_fix(file_id: int, analysis_id: int) -> dict[str, Any]:
 async def knoxiq_get_fix_plan(
     file_id: int, analysis_ids: list[int]
 ) -> list[dict[str, Any]]:
-    """Fetch full KnoxIQ fix data (developer_prompt, remediation, poc) for chosen analyses.
+    """Return KnoxIQ's fix data for several vulnerability analyses of a build.
 
-    Call this only for the analysis IDs a user has confirmed they want fixed -
-    it fetches the full finding payload, which is heavier than `list_analyses`.
+    Same per-finding fields as for a single analysis (remediation guidance,
+    remediation, proof-of-concept verification steps, exploitability), grouped
+    by ``analysis_id``. Accepts at most 10 analysis IDs per call, since each
+    finding's payload is large.
     """
+    analysis_ids = list(dict.fromkeys(analysis_ids))  # de-duplicate, keep order
+    if len(analysis_ids) > MAX_FIX_PLAN_IDS:
+        raise AppknoxAPIError(
+            f"Too many analysis_ids ({len(analysis_ids)}); at most "
+            f"{MAX_FIX_PLAN_IDS} per call — split them across several calls."
+        )
     results = await asyncio.gather(
         *(
             client.list_knoxiq_findings(file_id, analysis_id)

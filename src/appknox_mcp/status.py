@@ -87,15 +87,13 @@ def _readiness(
 
 @mcp.tool(title="Get scan status", annotations=READ_ONLY)
 async def knoxiq_get_scan_status(file_id: int) -> dict[str, Any]:
-    """Report whether a build's scan and KnoxIQ analysis are ready, with a clear message.
+    """Report whether a build's scan and KnoxIQ analysis have finished.
 
-    Call this right after resolving a ``file_id`` and before listing findings: it
-    tells you (and the user) whether KnoxIQ findings are actually available yet, or
-    why they are not — scan still running, KnoxIQ not enabled for the organization,
-    the build predates KnoxIQ, etc. ``ready`` is true only when findings are
-    available; when it is false, show ``message`` to the user and do NOT present an
-    empty findings list as "no vulnerabilities found". Also used by
-    ``knoxiq_verify_fixes`` to avoid declaring fixes confirmed before the re-scan.
+    ``ready`` is true only when KnoxIQ findings are available. When it is false,
+    ``message`` gives the reason: scan still running, KnoxIQ queued or running,
+    KnoxIQ not enabled for the organization, or the build predates KnoxIQ. In
+    that state an empty findings list does not mean the build has no
+    vulnerabilities.
     """
     file = await client.get_file(file_id)
     code = file.knoxiq_status
