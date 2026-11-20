@@ -1,5 +1,7 @@
 # Appknox MCP Server
 
+<!-- mcp-name: io.github.appknox/appknox-mcp -->
+
 An [MCP](https://modelcontextprotocol.io) server that connects your AI coding
 agent to [Appknox](https://www.appknox.com) KnoxIQ, so it can **fetch the
 vulnerabilities Appknox found in your app, fix them in your repo, and verify each
@@ -241,6 +243,22 @@ To create one:
 Per-client config file paths and shapes: [INSTALL.md](INSTALL.md#3-write-the-mcp-config-for-the-client).
 
 ---
+
+## Data handling & privacy
+
+- **Runs locally.** The server is a process on your machine, spawned by your
+  agent over stdio. It talks only to your Appknox base URL over HTTPS.
+- **Sends:** build/vulnerability IDs in API requests, and — only for
+  `upload_binary` — the app binary you point it at, uploaded straight to
+  Appknox storage through a short-lived presigned URL.
+- **Never sends your source code.** Your agent reads and edits code and runs
+  PoC checks locally; this server only reads findings and uploads binaries.
+- **Stores nothing.** No local cache or telemetry; your token lives wherever
+  your MCP client keeps its config (the Claude Code plugin keeps it in the OS
+  credential store).
+
+Data processed by Appknox is covered by the
+[Appknox Privacy Policy](https://www.appknox.com/privacy-policy).
 
 ## Uninstall
 

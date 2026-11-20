@@ -2,11 +2,11 @@
 
 from typing import Any
 
-from appknox_mcp.app import client, mcp
+from appknox_mcp.app import READ_ONLY, client, mcp
 from appknox_mcp.client import AppknoxAPIError
 
 
-@mcp.tool
+@mcp.tool(title="Resolve latest build", annotations=READ_ONLY)
 async def resolve_latest_file(
     package_name: str, platform: str | None = None
 ) -> dict[str, Any]:

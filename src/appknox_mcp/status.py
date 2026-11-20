@@ -8,7 +8,7 @@ showing an empty list.
 
 from typing import Any
 
-from appknox_mcp.app import client, mcp
+from appknox_mcp.app import READ_ONLY, client, mcp
 
 # KnoxIQScanStatus codes mirrored from mycroft (knoxiq/enums.py).
 KNOXIQ_LEGACY = -1
@@ -85,7 +85,7 @@ def _readiness(
     )
 
 
-@mcp.tool
+@mcp.tool(title="Get scan status", annotations=READ_ONLY)
 async def knoxiq_get_scan_status(file_id: int) -> dict[str, Any]:
     """Report whether a build's scan and KnoxIQ analysis are ready, with a clear message.
 

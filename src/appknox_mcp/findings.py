@@ -3,11 +3,11 @@
 import asyncio
 from typing import Any
 
-from appknox_mcp.app import client, mcp
+from appknox_mcp.app import READ_ONLY, client, mcp
 from appknox_mcp.models import Analysis
 
 
-@mcp.tool
+@mcp.tool(title="Get build info", annotations=READ_ONLY)
 async def get_file_info(file_id: int) -> dict[str, Any]:
     """Fetch a file's identity and scan summary (package_name, version, platform, risk counts).
 
@@ -72,7 +72,7 @@ def _to_row(analysis: Analysis, include_exploitability: bool) -> dict[str, Any]:
     }
 
 
-@mcp.tool
+@mcp.tool(title="List vulnerabilities", annotations=READ_ONLY)
 async def list_analyses(
     file_id: int,
     min_risk: int | None = None,
@@ -123,7 +123,7 @@ async def list_analyses(
     return [_to_row(a, include_exploitability) for a in analyses]
 
 
-@mcp.tool
+@mcp.tool(title="Prepare one fix", annotations=READ_ONLY)
 async def knoxiq_prepare_fix(file_id: int, analysis_id: int) -> dict[str, Any]:
     """Gather everything needed to fix ONE vulnerability, in a single call.
 
@@ -142,7 +142,7 @@ async def knoxiq_prepare_fix(file_id: int, analysis_id: int) -> dict[str, Any]:
     }
 
 
-@mcp.tool
+@mcp.tool(title="Get fix plan", annotations=READ_ONLY)
 async def knoxiq_get_fix_plan(
     file_id: int, analysis_ids: list[int]
 ) -> list[dict[str, Any]]:

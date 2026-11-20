@@ -174,14 +174,14 @@ function Add-Gitignored($entry) {
 }
 
 # Claude Code also gets this as a plugin (marketplace-installed at user scope):
-# the plugin adds the /appknox:<name> slash commands + fixer agent - it does
-# NOT provide the working MCP connection with real credentials (its own
-# bundled .mcp.json reads $env:APPKNOX_ACCESS_TOKEN/$env:APPKNOX_BASE_URL from
-# the environment, since that file is shared plugin code, not a personal
-# config). The actual credentialed connection is the `claude mcp add --scope
-# user` call above (configure_mcp.py's "claude" client) - this just adds the
-# commands on top of it. Commands are namespaced /appknox:<name> - the plugin
-# system always prefixes <plugin>:<command>, no opt-out.
+# the plugin adds the /appknox:<name> slash commands + fixer agent, and its own
+# pinned MCP entry (`uvx appknox-mcp==<version>`). That entry takes its token
+# from the plugin's userConfig - Claude Code prompts for it when the plugin is
+# enabled and keeps it in the OS credential store - so it never reads this
+# shell's environment. The `claude mcp add --scope user` call above
+# (configure_mcp.py's "claude" client) remains the connection for non-plugin
+# use. Commands are namespaced /appknox:<name> - the plugin system always
+# prefixes <plugin>:<command>, no opt-out.
 function Install-ClaudePlugin {
     if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
         Write-Warn "claude CLI not found - skipping plugin install (commands/agent won't be available)."
@@ -190,9 +190,8 @@ function Install-ClaudePlugin {
     claude plugin marketplace add $RepoDir --scope user | Out-Null
     claude plugin install appknox@appknox -y | Out-Null
     Write-Info "OK Installed the appknox plugin (slash commands + fixer agent, user scope)"
-    Write-Warn "The plugin's OWN MCP entry (separate from the one just registered above)"
-    Write-Warn "reads `$env:APPKNOX_ACCESS_TOKEN/`$env:APPKNOX_BASE_URL at launch - set them"
-    Write-Warn "as user env vars if /appknox:* commands need it too."
+    Write-Info "-> Claude Code will ask for the plugin's Appknox token when it next starts"
+    Write-Info "   (stored in your OS credential store; separate from the entry above)."
 }
 
 foreach ($Client in $Selected) {

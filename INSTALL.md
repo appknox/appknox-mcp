@@ -272,7 +272,8 @@ claude plugin install appknox@appknox -y
 ```
 
 > The GitHub-hosted form (second line above) needs
-> `.claude-plugin/marketplace.json` to exist **on the repo's default branch**
+> `.claude-plugin/marketplace.json` (and the plugin under `plugins/appknox/`)
+> to exist **on the repo's default branch**
 > (`develop`, not `main`) — `claude plugin marketplace add owner/repo` always
 > clones that branch, never a feature branch. If it's ever missing there
 > (e.g. mid-migration), use the local-path form instead.
@@ -281,10 +282,10 @@ This installs at **user scope** (the default), so the commands/agent are
 available from any repo afterward, not just the one you ran this in. Commands
 are namespaced `/appknox:<name>` (Claude Code's plugin system always prefixes
 `<plugin>:<command>` — there's no way to opt out of that and still use the
-formal plugin mechanism). Its bundled MCP entry reads `APPKNOX_ACCESS_TOKEN`/
-`APPKNOX_BASE_URL` from the environment at launch — export them in the user's
-shell profile, or rely on the project-scoped `.mcp.json` above (token baked in,
-works without exporting anything, but only in that one repo).
+formal plugin mechanism). Its bundled MCP entry launches a pinned `uvx appknox-mcp==<version>` and
+takes its credentials from the plugin's own settings: Claude Code prompts for
+the Appknox access token (and optional base URL) when the plugin is enabled,
+and stores the token in the OS credential store — nothing to export.
 `scripts/install.sh`/`install.ps1` do this step automatically when Claude Code
 is selected.
 
