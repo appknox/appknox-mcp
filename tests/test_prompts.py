@@ -2,7 +2,7 @@
 
 import pytest
 
-from appknox_mcp import findings, prompts, remote, remote_upload, upload
+from appknox_mcp import findings, prompts, remote
 from appknox_mcp.app import mcp
 from appknox_mcp.client import AppknoxAPIError
 from appknox_mcp.instructions import SERVER_SUMMARY, workflow_text
@@ -34,17 +34,19 @@ def test_fix_and_verify_prompts():
     assert "step 7" in prompts.verify(binary_path="app.apk")
 
 
-def test_prompts_use_split_upload_in_remote_mode():
-    assert "upload_binary(path)" in prompts.verify()
+def test_prompts_describe_remote_upload_in_remote_mode():
+    assert "put_command" not in prompts.verify()
     prompts.set_remote_mode(True)
     text = prompts.verify()
-    assert "upload_binary" not in text
-    assert "upload_start" in text and "upload_complete" in text
+    assert "upload_binary(path, upload_id)" in text
+    assert "put_command" in text
 
 
-def test_remote_workflow_text_has_no_local_upload_tool():
-    assert "upload_binary" not in workflow_text(remote=True)
-    assert "upload_binary" in workflow_text(remote=False)
+def test_remote_workflow_text_keeps_one_upload_tool():
+    for remote_mode in (True, False):
+        text = workflow_text(remote=remote_mode)
+        assert "upload_binary" in text
+        assert "upload_start" not in text
 
 
 def test_server_summary_is_neutral():
@@ -66,25 +68,6 @@ async def test_fix_plan_caps_analysis_ids(monkeypatch):
     # Duplicates don't count against the cap.
     result = await findings.knoxiq_get_fix_plan(1, [5] * 20 + [6])
     assert [r["analysis_id"] for r in result] == [5, 6]
-
-
-async def test_upload_start_output_is_data_only(monkeypatch):
-    async def handshake():
-        return {
-            "url": "https://storage.test/o",
-            "upload_key": "k",
-            "upload_key_signed": "s",
-        }
-
-    monkeypatch.setattr(upload, "_request_upload_url", handshake)
-    result = await remote_upload.upload_start()
-    assert "next_step" not in result
-    assert set(result) >= {
-        "presigned_url",
-        "upload_key",
-        "upload_key_signed",
-        "put_command",
-    }
 
 
 def test_upload_tools_flag(monkeypatch):

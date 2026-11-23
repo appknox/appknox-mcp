@@ -147,3 +147,49 @@ async def test_resolve_no_scanned_file_raises(fake_projects) -> None:
     )
     with pytest.raises(AppknoxAPIError, match="scanned file"):
         await resolve.resolve_latest_file("com.x")
+
+
+def _project(pid: int, pkg: str, last_file_id: int, platform: str = "Android"):
+    return {
+        "id": pid,
+        "package_name": pkg,
+        "platform": 0 if platform == "Android" else 1,
+        "platform_display": platform,
+        "last_file_id": last_file_id,
+        "file_count": 1,
+    }
+
+
+async def test_substring_matches_are_ignored(fake_projects) -> None:
+    # The API filter is a substring match: a newer build of a *different* app
+    # whose identifier contains ours must not win.
+    fake_projects(
+        [
+            _project(1, "com.example.app", last_file_id=10),
+            _project(2, "com.example.app.beta", last_file_id=99),
+            _project(3, "com.example.application", last_file_id=98),
+        ]
+    )
+    out = await resolve.resolve_latest_file("com.example.app", "android")
+    assert out["project_id"] == 1
+    assert out["file_id"] == 10
+
+
+async def test_exact_match_is_case_insensitive_and_trimmed(fake_projects) -> None:
+    fake_projects([_project(1, "com.Example.App", last_file_id=7, platform="iOS")])
+    out = await resolve.resolve_latest_file("  com.example.app ", "ios")
+    assert out["file_id"] == 7
+
+
+async def test_only_near_matches_raises_with_suggestions(fake_projects) -> None:
+    fake_projects(
+        [
+            _project(2, "com.example.app.beta", last_file_id=99),
+            _project(3, "com.example.app.dev", last_file_id=98),
+        ]
+    )
+    with pytest.raises(AppknoxAPIError) as err:
+        await resolve.resolve_latest_file("com.example.app", "android")
+    message = str(err.value)
+    assert "No Appknox project found for package_name 'com.example.app'" in message
+    assert "com.example.app.beta" in message and "com.example.app.dev" in message

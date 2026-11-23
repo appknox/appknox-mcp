@@ -130,16 +130,15 @@ re-scan with the previous build. Guided workflows are available as the \
 prompts `triage`, `fix` and `verify`."""
 
 _REMOTE_UPLOAD = (
-    "upload_start -> PUT the binary to the returned presigned URL with its "
-    "put_command -> upload_complete(upload_key, upload_key_signed)"
+    "upload_binary(path) -> run its put_command on this machine -> "
+    "upload_binary(path, upload_id)"
 )
 
 
 def workflow_text(remote: bool) -> str:
-    """The workflow, with the upload step matching the server's mode: remote
-    servers can't read local files, so upload is split around the PUT."""
+    """The workflow, with the upload step matching the server's mode: a remote
+    server can't read local files, so its upload_binary has the caller run the
+    file transfer between two calls."""
     if not remote:
         return WORKFLOW_INSTRUCTIONS
-    return WORKFLOW_INSTRUCTIONS.replace("upload_binary(path)", _REMOTE_UPLOAD).replace(
-        "upload_binary.", "upload_start, upload_complete."
-    )
+    return WORKFLOW_INSTRUCTIONS.replace("upload_binary(path)", _REMOTE_UPLOAD)

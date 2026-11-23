@@ -14,20 +14,36 @@ async def resolve_latest_file(
 
     ``package_name`` is the Android applicationId or the iOS bundle id.
     ``platform`` is "android" or "ios"; it tells apart an Android and an iOS
-    project that share an identifier. When several projects match, the one with
-    the most recently scanned build is returned. Returns an error when no
+    project that share an identifier. Only an exact (case-insensitive) match of
+    the identifier counts; projects whose identifier merely contains it are
+    listed in the error instead. When several projects match exactly, the one
+    with the most recently scanned build is returned. Returns an error when no
     project matches or no build has completed a scan.
     """
-    projects = await client.list_projects(package_name)
+    wanted = package_name.strip()
+    candidates = await client.list_projects(wanted)
+    # The API's package_name filter is a substring match (com.example.app also
+    # returns com.example.app.beta); only an exact identifier match counts.
+    # Case-insensitive: iOS bundle ids are, and Appknox stores them as given.
+    projects = [
+        p
+        for p in candidates
+        if (p.package_name or "").strip().lower() == wanted.lower()
+    ]
     if platform is not None:
         want = platform.strip().lower()
         projects = [p for p in projects if (p.platform_display or "").lower() == want]
 
     if not projects:
         scope = f" ({platform})" if platform else ""
+        near = sorted({p.package_name for p in candidates if p.package_name})
+        hint = (
+            f" Projects with similar identifiers: {', '.join(near[:10])}."
+            if near
+            else " Upload a build for this app first."
+        )
         raise AppknoxAPIError(
-            f"No Appknox project found for package_name '{package_name}'{scope}. "
-            "Upload a build for this app first."
+            f"No Appknox project found for package_name '{wanted}'{scope}.{hint}"
         )
 
     # Several projects may share the identifier — use the one with the newest build.

@@ -10,6 +10,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from appknox_mcp import remote, remote_upload, upload
+from appknox_mcp.client import AppknoxAPIError
 
 API = "https://api.appknox.test"
 PUBLIC = "https://mcp.appknox.test"
@@ -188,10 +189,10 @@ def test_config_requires_api_and_public_urls(monkeypatch):
     assert config.public_url == PUBLIC
 
 
-# --- Split upload tools ------------------------------------------------------
+# --- Remote upload_binary ------------------------------------------------------
 
 
-async def test_upload_start_returns_put_command(monkeypatch):
+async def test_remote_upload_first_call_returns_quoted_put_command(monkeypatch):
     async def handshake():
         return {
             "url": "https://storage.test/obj?sig=a'b",
@@ -200,18 +201,23 @@ async def test_upload_start_returns_put_command(monkeypatch):
         }
 
     monkeypatch.setattr(upload, "_request_upload_url", handshake)
-    result = await remote_upload.upload_start()
-    assert result["upload_key"] == "k"
-    assert result["upload_key_signed"] == "ks"
+    result = await remote_upload.remote_upload_binary("build/My App's.apk")
+    assert result["status"] == "awaiting_upload"
+    assert result["file_name"] == "My App's.apk"
+    assert remote_upload._decode_upload_id(result["upload_id"]) == ("k", "ks")
     posix = result["put_command"]["posix"]
     assert posix.startswith("curl --fail")
-    assert "-T <path-to-binary>" in posix
-    # Single quotes in the URL can't break out of the shell quoting.
-    assert "'https://storage.test/obj?sig=a'\\''b'" in posix
-    assert result["put_command"]["windows_powershell"].startswith("curl.exe --fail")
+    # Path and URL stay single shell words, whatever they contain.
+    import shlex as _shlex
+
+    words = _shlex.split(posix)
+    assert words[words.index("-T") + 1] == "build/My App's.apk"
+    assert words[-1] == "https://storage.test/obj?sig=a'b"
+    ps = result["put_command"]["windows_powershell"]
+    assert "-T 'build/My App''s.apk'" in ps
 
 
-async def test_upload_complete_creates_submission_and_waits(monkeypatch):
+async def test_remote_upload_second_call_confirms_and_waits(monkeypatch):
     async def create(k, ks):
         assert (k, ks) == ("k", "ks")
         return 55
@@ -222,13 +228,29 @@ async def test_upload_complete_creates_submission_and_waits(monkeypatch):
 
     monkeypatch.setattr(upload, "_create_submission", create)
     monkeypatch.setattr(upload, "_await_file_id", wait)
-    assert await remote_upload.upload_complete("k", "ks") == {
+    upload_id = remote_upload._encode_upload_id("k", "ks")
+    assert await remote_upload.remote_upload_binary("app.apk", upload_id) == {
+        "status": "submitted",
         "submission_id": 55,
+        "file_name": "app.apk",
         "file_id": 901,
     }
-    assert await remote_upload.upload_complete("k", "ks", wait_for_file_id=False) == {
-        "submission_id": 55
-    }
+    result = await remote_upload.remote_upload_binary(
+        "app.apk", upload_id, wait_for_file_id=False
+    )
+    assert "file_id" not in result
+
+
+async def test_remote_upload_rejects_foreign_upload_id():
+    with pytest.raises(AppknoxAPIError, match="not one this server issued"):
+        await remote_upload.remote_upload_binary("app.apk", "not-base64-json!!")
+
+
+def test_authorization_server_metadata_url_inserts_well_known():
+    assert (
+        remote.authorization_server_metadata_url("https://h.example/api/v2/oidc")
+        == "https://h.example/.well-known/oauth-authorization-server/api/v2/oidc"
+    )
 
 
 def test_config_host_allowlist_and_stateless_default(monkeypatch):

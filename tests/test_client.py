@@ -162,6 +162,31 @@ async def test_list_projects_returns_results() -> None:
     assert [p.id for p in projects] == [1]
 
 
+async def test_list_projects_reads_every_page() -> None:
+    """The package_name filter is a substring match, so the exact project can
+    sit on a later page of near matches."""
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        assert request.url.params["package_name"] == "com.x"
+        if request.url.params.get("offset") == "100":
+            return httpx.Response(
+                200, json={"results": [_project_json(2)], "next": None}
+            )
+        return httpx.Response(
+            200,
+            json={
+                "results": [_project_json(1)],
+                "next": "https://h/api/public_api/v1/projects?package_name=com.x&limit=100&offset=100",
+            },
+        )
+
+    projects = await _client(handler).list_projects("com.x")
+    assert [p.id for p in projects] == [1, 2]
+    assert len(seen) == 2
+
+
 async def test_create_submission_posts_json() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"

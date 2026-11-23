@@ -65,7 +65,7 @@ class RemoteConfig:
     # self-contained, so nothing is lost.
     stateless: bool = True
     # Off for clients that can neither read local files nor run a PUT (e.g.
-    # Google Connected Apps): drops upload_start/upload_complete.
+    # Google Connected Apps): drops upload_binary.
     upload_tools: bool = True
 
     @property
@@ -110,6 +110,16 @@ class RemoteConfig:
     def allowed_hosts(self) -> list[str]:
         extra = os.environ.get("APPKNOX_MCP_ALLOWED_HOSTS", "")
         return [self.public_host, *(h.strip() for h in extra.split(",") if h.strip())]
+
+
+def authorization_server_metadata_url(issuer_url: str) -> str:
+    """RFC 8414 §3.1: the well-known path goes between the issuer's host and
+    its path (``https://h/.well-known/oauth-authorization-server/api/v2/oidc``)."""
+    parsed = urlparse(issuer_url)
+    return (
+        f"{parsed.scheme}://{parsed.netloc}"
+        f"/.well-known/oauth-authorization-server{parsed.path.rstrip('/')}"
+    )
 
 
 def _env_flag(name: str, default: bool) -> bool:
