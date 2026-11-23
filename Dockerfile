@@ -16,11 +16,16 @@ COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 
 WORKDIR /app
-# Dependencies first (cached layer), then the project itself.
-COPY pyproject.toml uv.lock ./
-RUN uv sync --locked --no-dev --no-install-project
+# Dependencies first (cached layer), then the project itself. uv.lock is
+# gitignored in this repo, so CI builds resolve from pyproject.toml (the same
+# way `uv tool install appknox-mcp` does for users); a local checkout that has
+# a uv.lock builds from it exactly.
+COPY pyproject.toml uv.loc[k] ./
+RUN if [ -f uv.lock ]; then LOCK=--locked; else LOCK=; fi; \
+    uv sync $LOCK --no-dev --no-install-project
 COPY . .
-RUN uv sync --locked --no-dev --no-editable
+RUN if [ -f uv.lock ]; then LOCK=--locked; else LOCK=; fi; \
+    uv sync $LOCK --no-dev --no-editable
 
 
 FROM python:3.12-slim
