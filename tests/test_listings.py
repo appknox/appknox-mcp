@@ -25,9 +25,7 @@ async def test_every_tool_has_title_and_safety_hint():
 
 async def test_only_upload_writes():
     writers = {t.name for t in await mcp.list_tools() if not t.annotations.readOnlyHint}
-    # upload_complete exists in remote mode (it replaces upload_binary there).
-    assert writers <= {"upload_binary", "upload_complete"}
-    assert "upload_binary" in writers
+    assert writers == {"upload_binary"}
 
 
 def test_listing_manifests_match_package_version():
@@ -42,3 +40,45 @@ def test_listing_manifests_match_package_version():
 
 def test_readme_carries_mcp_registry_ownership_marker():
     assert "mcp-name: io.github.appknox/appknox-mcp" in (ROOT / "README.md").read_text()
+
+
+# --- Directory policy: descriptions describe, they don't steer -----------------
+# Claude's connector review rejects descriptions that tell the model how to
+# behave; Google Connected Apps also bans referencing or setting rules for
+# other tools. Workflow guidance belongs in prompts.py / the Claude plugin.
+
+import re
+
+from appknox_mcp import remote_upload
+
+_STEERING = re.compile(
+    r"\b(never|always|do not|don't|must|should|make sure|call this|present|"
+    r"instruction|instructions)\b|/appknox:",
+    re.IGNORECASE,
+)
+
+
+async def test_tool_descriptions_do_not_steer_the_model():
+    for tool in await mcp.list_tools():
+        hit = _STEERING.search(tool.description or "")
+        assert hit is None, f"{tool.name}: steering phrase {hit.group(0)!r}"
+
+
+async def test_tool_descriptions_do_not_reference_other_tools():
+    tools = await mcp.list_tools()
+    names = {t.name for t in tools}
+    for tool in tools:
+        others = {n for n in names - {tool.name} if n in (tool.description or "")}
+        assert not others, f"{tool.name} references {sorted(others)}"
+
+
+def test_remote_upload_description_passes_the_same_policy():
+    doc = remote_upload.remote_upload_binary.__doc__ or ""
+    hit = _STEERING.search(doc)
+    assert hit is None, f"remote upload_binary: steering phrase {hit.group(0)!r}"
+    assert len(doc) <= 800
+
+
+async def test_tool_descriptions_are_concise():
+    for tool in await mcp.list_tools():
+        assert len(tool.description or "") <= 800, tool.name

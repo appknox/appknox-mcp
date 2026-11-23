@@ -3,18 +3,23 @@
 import argparse
 import importlib.resources
 import sys
+import typing
 from pathlib import Path
 
 # Tool modules register their @mcp.tool tools on import.
 from appknox_mcp import (  # noqa: F401
     findings,
+    prompts,
     resolve,
     status,
     upload,
     verify,
 )
 from appknox_mcp.app import access_token, mcp
-from appknox_mcp.instructions import WORKFLOW_INSTRUCTIONS
+
+if typing.TYPE_CHECKING:
+    from appknox_mcp.remote import RemoteConfig
+from appknox_mcp.instructions import SERVER_SUMMARY
 
 
 def _print_install_guide() -> None:
@@ -115,23 +120,26 @@ def _run_remote(host: str | None, port: int | None, public_url: str | None) -> N
     """Serve over Streamable HTTP with per-user OAuth (see remote.py).
 
     Swaps stdio-only pieces for their remote equivalents: OAuth auth on the
-    server, the request-scoped client in OAuth mode, and the 3-step upload
-    tools in place of ``upload_binary`` (which needs the caller's disk).
+    server, the request-scoped client in OAuth mode, and a remote
+    ``upload_binary`` that hands the file transfer to the caller (this server
+    can't read the caller's disk).
     """
     from appknox_mcp import app as app_module
-    from appknox_mcp import remote, remote_upload  # noqa: F401  (registers tools)
+    from appknox_mcp import remote, remote_upload
 
     config = remote.RemoteConfig.from_env(host=host, port=port, public_url=public_url)
     mcp.auth = remote.build_auth(config)
     app_module.client.enable_remote(config.api_base_url)
-    mcp.remove_tool("upload_binary")
-    mcp.instructions = (
-        WORKFLOW_INSTRUCTIONS.replace(
-            "upload_binary(path)", "upload_start -> PUT the file -> upload_complete"
-        ).replace("upload_binary.", "upload_start, upload_complete.")
-        + remote.REMOTE_UPLOAD_NOTE
-    )
-    _add_health_route()
+    _remove_tool("upload_binary")
+    if config.upload_tools:
+        # Off e.g. for Google Connected Apps, whose clients can neither read
+        # files nor run the PUT.
+        remote_upload.register()
+    # Connector directories reject servers that steer the model; remote mode
+    # sends a neutral summary and offers the workflow as prompts instead.
+    mcp.instructions = SERVER_SUMMARY
+    prompts.set_remote_mode(True)
+    _add_health_routes(config)
     mcp.run(
         transport="http",
         host=config.host,
@@ -144,15 +152,52 @@ def _run_remote(host: str | None, port: int | None, public_url: str | None) -> N
     )
 
 
-def _add_health_route() -> None:
-    """Unauthenticated liveness probe for the load balancer / k8s — reports
-    only that the process serves HTTP, nothing about users or Appknox."""
+def _remove_tool(name: str) -> None:
+    """Tool removal lives on the local provider in FastMCP 3
+    (``FastMCP.remove_tool`` is deprecated)."""
+    mcp.local_provider.remove_tool(name)
+
+
+def _add_health_routes(config: "RemoteConfig") -> None:
+    """Unauthenticated probes for k8s / the load balancer. Neither reveals
+    anything about users or data.
+
+    * ``/healthz`` (liveness): the process serves HTTP.
+    * ``/readyz`` (readiness): Appknox (via the API base URL this server
+      uses) answers its OAuth metadata document — without it no token can be
+      verified, so the pod shouldn't take traffic.
+    """
+    from urllib.parse import urlparse
+
+    import httpx
     from starlette.requests import Request
     from starlette.responses import JSONResponse
+
+    from appknox_mcp import remote
+
+    # Probe mycroft the way this server reaches it (API base URL), at the
+    # issuer's metadata path; the issuer host itself is browser-facing and may
+    # not resolve from inside the pod.
+    metadata_url = remote.authorization_server_metadata_url(
+        config.api_base_url + urlparse(config.issuer_url).path
+    )
+    probe = httpx.AsyncClient(timeout=3.0)
 
     @mcp.custom_route("/healthz", methods=["GET"])
     async def healthz(_: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
+
+    @mcp.custom_route("/readyz", methods=["GET"])
+    async def readyz(_: Request) -> JSONResponse:
+        try:
+            response = await probe.get(metadata_url)
+            ok = response.status_code == 200
+        except httpx.HTTPError:
+            ok = False
+        return JSONResponse(
+            {"status": "ok" if ok else "unavailable", "oauth_server": ok},
+            status_code=200 if ok else 503,
+        )
 
 
 def main() -> None:

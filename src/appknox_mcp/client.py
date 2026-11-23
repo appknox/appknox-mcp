@@ -122,10 +122,12 @@ class AppknoxClient:
 
     async def list_projects(self, package_name: str) -> list[Project]:
         """List projects matching an app identifier (package_name / bundle id)."""
-        payload = await self._get(
+        # Every page: the filter is a substring match, so the exact project
+        # may sit beyond the first page of near matches.
+        rows = await self._paginate(
             f"{_V1}/projects", params={"package_name": package_name}
         )
-        return [Project.model_validate(row) for row in payload.get("results", [])]
+        return [Project.model_validate(row) for row in rows]
 
     # -- Analyses / KnoxIQ findings -----------------------------------------
 

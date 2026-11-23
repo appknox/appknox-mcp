@@ -10,27 +10,40 @@ from appknox_mcp.client import AppknoxAPIError
 async def resolve_latest_file(
     package_name: str, platform: str | None = None
 ) -> dict[str, Any]:
-    """Resolve an app identifier (+ platform) to its Appknox project and latest file_id.
+    """Find the Appknox project for an app and return its latest build.
 
-    Pass the app's identifier (Android ``applicationId`` or iOS bundle id) and
-    the ``platform`` you detected it for (``"android"`` or ``"ios"``). Platform
-    is what disambiguates when an Android and an iOS project share the same
-    identifier — determine it from the repo (which file you read the identifier
-    from), do not let the API guess. Returns the matching project and its most
-    recent file. If several projects still share the identifier, the one with
-    the newest scanned build is used. Raises ``AppknoxAPIError`` on no match
-    or no completed scan.
+    ``package_name`` is the Android applicationId or the iOS bundle id.
+    ``platform`` is "android" or "ios"; it tells apart an Android and an iOS
+    project that share an identifier. Only an exact (case-insensitive) match of
+    the identifier counts; projects whose identifier merely contains it are
+    listed in the error instead. When several projects match exactly, the one
+    with the most recently scanned build is returned. Returns an error when no
+    project matches or no build has completed a scan.
     """
-    projects = await client.list_projects(package_name)
+    wanted = package_name.strip()
+    candidates = await client.list_projects(wanted)
+    # The API's package_name filter is a substring match (com.example.app also
+    # returns com.example.app.beta); only an exact identifier match counts.
+    # Case-insensitive: iOS bundle ids are, and Appknox stores them as given.
+    projects = [
+        p
+        for p in candidates
+        if (p.package_name or "").strip().lower() == wanted.lower()
+    ]
     if platform is not None:
         want = platform.strip().lower()
         projects = [p for p in projects if (p.platform_display or "").lower() == want]
 
     if not projects:
         scope = f" ({platform})" if platform else ""
+        near = sorted({p.package_name for p in candidates if p.package_name})
+        hint = (
+            f" Projects with similar identifiers: {', '.join(near[:10])}."
+            if near
+            else " Upload a build for this app first."
+        )
         raise AppknoxAPIError(
-            f"No Appknox project found for package_name '{package_name}'{scope}. "
-            "Upload a build for this app first."
+            f"No Appknox project found for package_name '{wanted}'{scope}.{hint}"
         )
 
     # Several projects may share the identifier — use the one with the newest build.

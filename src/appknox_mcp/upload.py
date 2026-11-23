@@ -68,16 +68,13 @@ async def _await_file_id(
 async def upload_binary(
     file_path: str, wait_for_file_id: bool = True, timeout_seconds: int = 300
 ) -> dict[str, Any]:
-    """Upload an app binary (APK/IPA/etc.) to the Appknox VAPT platform and start a scan.
+    """Upload an app binary (APK, AAB or IPA) from a local path and start a scan.
 
-    Give the local path to a built binary. This runs the full upload flow — request
-    a presigned URL, PUT the file, then trigger validation and the scan. When
-    ``wait_for_file_id`` is true (default) it polls until Appknox has validated the
-    build and assigned it a ``file_id`` (usually seconds), which is what later steps
-    need. The scan and KnoxIQ analysis then run asynchronously — poll
-    ``knoxiq_get_scan_status(file_id)`` or run ``knoxiq_verify_fixes`` to wait.
-    Returns ``{file_id, submission_id, file_name}`` (``file_id`` omitted when
-    ``wait_for_file_id`` is false). Raises ``AppknoxAPIError`` on any failure.
+    Requests a presigned URL, uploads the file, and confirms the upload, which
+    starts validation and scanning. With ``wait_for_file_id`` (default true) it
+    waits up to ``timeout_seconds`` for Appknox to assign the new build a
+    ``file_id``. Scanning and KnoxIQ analysis continue after it returns.
+    Returns ``file_id`` (when waited for), ``submission_id`` and ``file_name``.
     """
     path = Path(file_path).expanduser()
     if not path.is_file():
