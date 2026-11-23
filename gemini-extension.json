@@ -1,0 +1,27 @@
+{
+  "name": "appknox",
+  "version": "1.0.2",
+  "description": "Fix and verify mobile app vulnerabilities found by Appknox KnoxIQ.",
+  "mcpServers": {
+    "appknox": {
+      "command": "uvx",
+      "args": [
+        "appknox-mcp==1.0.2"
+      ]
+    }
+  },
+  "settings": [
+    {
+      "name": "Appknox access token",
+      "description": "Service-account credential in the form <Access Key ID>:<Secret>.",
+      "envVar": "APPKNOX_ACCESS_TOKEN",
+      "sensitive": true
+    },
+    {
+      "name": "Appknox base URL",
+      "description": "Leave empty for https://publicapi.appknox.com; set only for a dedicated/on-prem instance.",
+      "envVar": "APPKNOX_BASE_URL",
+      "sensitive": false
+    }
+  ]
+}

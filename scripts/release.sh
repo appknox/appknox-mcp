@@ -43,12 +43,18 @@ VERSION="$(uv version --short)"
 TAG="v$VERSION"
 info "New version: $VERSION (tag: $TAG)"
 
+step "Syncing listing manifests to $VERSION"
+# Claude plugin, MCP Registry server.json and Gemini extension repeat (and
+# pin) the package version — see scripts/sync_version.py.
+uv run --no-project python scripts/sync_version.py
+
 if git rev-parse "$TAG" >/dev/null 2>&1; then
   die "Tag $TAG already exists — this version was already released."
 fi
 
 step "Committing and pushing"
-git add pyproject.toml
+git add pyproject.toml plugins/appknox/.claude-plugin/plugin.json \
+  plugins/appknox/.mcp.json server.json gemini-extension.json
 git commit -m "Bump version to $VERSION"
 git push origin develop
 git tag "$TAG"

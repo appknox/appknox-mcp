@@ -1,0 +1,44 @@
+{
+  "name": "appknox",
+  "displayName": "Appknox KnoxIQ",
+  "version": "1.0.2",
+  "description": "Appknox KnoxIQ fix-and-verify: fetch the vulnerabilities Appknox found in your app, fix them in your repo, verify with the finding's PoC, and re-scan.",
+  "author": {
+    "name": "Appknox",
+    "url": "https://www.appknox.com"
+  },
+  "homepage": "https://github.com/appknox/appknox-mcp",
+  "repository": "https://github.com/appknox/appknox-mcp",
+  "documentationUrl": "https://github.com/appknox/appknox-mcp#readme",
+  "supportUrl": "https://github.com/appknox/appknox-mcp/issues",
+  "privacyPolicyUrl": "https://www.appknox.com/privacy-policy",
+  "keywords": [
+    "security",
+    "mobile",
+    "vulnerabilities",
+    "appknox",
+    "knoxiq",
+    "android",
+    "ios"
+  ],
+  "network": {
+    "hosts": [
+      "publicapi.appknox.com"
+    ]
+  },
+  "userConfig": {
+    "access_token": {
+      "type": "string",
+      "title": "Appknox access token",
+      "description": "Service-account credential in the form <Access Key ID>:<Secret>. Create one in the Appknox dashboard under Organization settings > Service accounts.",
+      "sensitive": true,
+      "required": true
+    },
+    "base_url": {
+      "type": "string",
+      "title": "Appknox Public API base URL",
+      "description": "Leave as the default unless your organization uses a dedicated or on-prem Appknox instance.",
+      "default": "https://publicapi.appknox.com"
+    }
+  }
+}
