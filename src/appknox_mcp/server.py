@@ -153,13 +153,9 @@ def _run_remote(host: str | None, port: int | None, public_url: str | None) -> N
 
 
 def _remove_tool(name: str) -> None:
-    """FastMCP 3 moved tool removal to the local provider; 2.x (still allowed
-    by pyproject) only has ``FastMCP.remove_tool``."""
-    provider = getattr(mcp, "local_provider", None)
-    if provider is not None:
-        provider.remove_tool(name)
-    else:
-        mcp.remove_tool(name)
+    """Tool removal lives on the local provider in FastMCP 3
+    (``FastMCP.remove_tool`` is deprecated)."""
+    mcp.local_provider.remove_tool(name)
 
 
 def _add_health_routes(config: "RemoteConfig") -> None:
