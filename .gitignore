@@ -11,3 +11,6 @@ uv.lock
 .DS_Store
 CLAUDE.md
 .claude/
+
+# Runtime env files (examples are committed as *.env.example)
+deploy/*.env

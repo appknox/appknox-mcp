@@ -25,7 +25,9 @@ async def test_every_tool_has_title_and_safety_hint():
 
 async def test_only_upload_writes():
     writers = {t.name for t in await mcp.list_tools() if not t.annotations.readOnlyHint}
-    assert writers == {"upload_binary"}
+    # upload_complete exists in remote mode (it replaces upload_binary there).
+    assert writers <= {"upload_binary", "upload_complete"}
+    assert "upload_binary" in writers
 
 
 def test_listing_manifests_match_package_version():

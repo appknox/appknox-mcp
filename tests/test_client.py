@@ -188,3 +188,9 @@ async def test_list_project_files_follows_pagination() -> None:
     client = _client(handler)
     rows = await client.list_project_files(3)
     assert [r.id for r in rows] == [1, 2]
+
+
+def test_ensure_https_keeps_plain_http_only_for_loopback() -> None:
+    assert _ensure_https("http://127.0.0.1:8010") == "http://127.0.0.1:8010"
+    assert _ensure_https("http://localhost:8000") == "http://localhost:8000"
+    assert _ensure_https("http://api.appknox.com") == "https://api.appknox.com"
