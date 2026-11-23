@@ -3,9 +3,12 @@ name: Container image
 # Publishes ghcr.io/appknox/appknox-mcp, the image the remote (hosted) MCP
 # server runs from (staging-fluxcd: sherlock chart, `mcp.enabled: true`).
 #
+#   - Pull request (opened / new commits): tag `<head-branch>_<short-sha>`,
+#     so any PR can be deployed to a sherlock instance before it merges.
+#     Same-repo PRs only (fork PRs get no packages:write token).
 #   - Manual run (Actions -> Container image -> Run workflow, pick a branch):
 #     tag `<branch>_<short-sha>` — the same convention as appknox/staging's
-#     images — for testing a branch on a sherlock instance.
+#     images. (GitHub only offers this once the workflow is on develop.)
 #   - Published GitHub Release (same event publish.yml uses): tags `<version>`
 #     (pyproject.toml, without the leading v) and `latest`.
 #
@@ -13,6 +16,8 @@ name: Container image
 # repo's own GITHUB_TOKEN to push.
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
   release:
     types: [published]
@@ -23,9 +28,15 @@ permissions:
 
 jobs:
   image:
+    # Fork PRs can't push packages; skip them instead of failing.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # On PRs, build the PR's head commit (the one the tag names), not
+          # GitHub's merge-preview commit.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Compute tags
         id: tags
@@ -34,7 +45,8 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-          REF_NAME: ${{ github.ref_name }}
+          REF_NAME: ${{ github.head_ref || github.ref_name }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           IMAGE=ghcr.io/appknox/appknox-mcp
           if [ "$EVENT" = "release" ]; then
@@ -42,7 +54,7 @@ jobs:
             echo "tags=$IMAGE:$VERSION,$IMAGE:latest" >> "$GITHUB_OUTPUT"
           else
             BRANCH="$(printf '%s' "$REF_NAME" | tr '/' '-' | tr -cd '[:alnum:]._-')"
-            echo "tags=$IMAGE:${BRANCH}_${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "tags=$IMAGE:${BRANCH}_${COMMIT::7}" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: docker/setup-buildx-action@v3
@@ -61,7 +73,7 @@ jobs:
           tags: ${{ steps.tags.outputs.tags }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
